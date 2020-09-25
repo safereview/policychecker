@@ -1,6 +1,7 @@
-# NOTS: Please update this file with your information
-# The file is tracked by Git, and therefore,
-# your personal info will not be pushed to the remote repo.
+# NOTE: Please update the following information with yours
+# This file will be added to .gitignore file, and therefore,
+# will not be tracked by Git. Thus, your personal information
+# will not be pushed to the remote repo.
 
 USER = 'admin'
 PASS = 'admin'
