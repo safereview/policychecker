@@ -50,16 +50,64 @@ def get_blob_content(project, head, fname):
     return REST.get(endpoint = endpoint)
 
 
+# Get a list of groups
+def list_groups():
+    endpoint = f"groups/"
+    return REST.get(endpoint = endpoint)
+
+
+# Get info about a specific group
+def get_group_info(gid):
+    endpoint = f"groups/{gid}/detail"
+    return REST.get(endpoint = endpoint)
+
+
+# Get account id
+def  get_account_id(account):
+    endpoint = f"/accounts/?q=name:{account}"
+    res = REST.get(endpoint = endpoint)
+    return res[0]['_account_id']
+
+
+# Get account info
+def get_account_info(aid):
+    endpoint = f"accounts/{aid}"
+    return REST.get(endpoint = endpoint)
+
+
 if __name__ == '__main__':
     # Gerrit REST API call
     REST = get_rest_api(USER, PASS, url)
 
-    # Try out some APIs
-    access_rights = get_access_rights(project)
-    branch_head = get_branch_head(project, CONFIG_BRANCH)
-
-    # Print out results
-    print(branch_head)
+    # Prepare pprint
     import pprint
     pp = pprint.PrettyPrinter(indent=4)
-    pp.pprint(access_rights)
+
+    # Get a list of groups on the server
+    groups = list_groups()
+    pp.pprint(groups)
+
+    # Get members in a group
+    group = get_group_info('1')
+    print(group['members'])
+
+    # Get account info using the username (e.g. 'r1')
+    account = get_account_info(get_account_id('r1'))
+    print(account)
+
+    # Get head of the branch
+    branch_head = get_branch_head(project, CONFIG_BRANCH)
+    print(branch_head)
+
+    # Get info about the access rights
+    access_rights = get_access_rights(project)
+    access_rights = access_rights["All-Projects"]
+    # Print out all items in access rights
+    for item in access_rights:
+        print(item)
+
+    # Print out groups listed in access rights
+    pp.pprint(access_rights['groups'])
+
+    # Print out permissions listed in access rights
+    pp.pprint(access_rights['local'])
