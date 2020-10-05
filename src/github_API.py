@@ -31,19 +31,31 @@ def get_blob_content(g, user, repo, path):
 	return g.get_repo(repo_name).get_contents(path).decoded_content
 
 
-if __name__ == '__main__':
-    # GitHub REST API call
+# Create a status check
+def create_status_check(g, user, repo, sha):
+	repo_name = "{}/{}".format(user, repo)
+	repo = g.get_repo(repo_name)
+	res = repo.get_commit(sha=sha).create_status(
+		state = "success",
+		#target_url="https://myURL.com",
+		context = "CODE_REVIEW_POLICY",
+		description = crp_signature
+	)
+	return res
 
+
+if __name__ == '__main__':
+	# GitHub REST API call
 	REST = Github(TOKEN)
 
-    # Try out some APIs
+	# Try out some APIs
 	branches = get_branches (REST, USER, repo)
 	branch = get_branch (REST, USER, repo, "master")
 	branch_head = get_branch_head(REST, USER, repo, "master")
+	crp_sig = create_status_check(REST, USER, repo, 'HEAD')
 
-    # Print out results
+	# Print out results
 	print(branch_head)
 	print(branch)
 	print(branches)
-
-
+	print(crp_sig)
