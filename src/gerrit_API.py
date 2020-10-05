@@ -75,6 +75,18 @@ def get_account_info(aid):
     return REST.get(endpoint = endpoint)
 
 
+# Create a new code review label
+def create_review_label(project):
+
+    label = {
+        'commit_message' : 'Code-Review-Policy',
+        'values' : crp_signature
+    }
+
+    endpoint = f"projects/{project}/labels/Code-Review-Policy"
+    return REST.put(endpoint = endpoint, data = label)
+
+
 if __name__ == '__main__':
     # Gerrit REST API call
     REST = get_rest_api(USER, PASS, url)
