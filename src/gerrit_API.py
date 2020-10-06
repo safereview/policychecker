@@ -80,11 +80,17 @@ def create_review_label(project):
 
     label = {
         'commit_message' : 'Code-Review-Policy',
-        'values' : crp_signature
+        'values' : { '0' : crp_signature }
     }
 
     endpoint = f"projects/{project}/labels/Code-Review-Policy"
     return REST.put(endpoint = endpoint, data = label)
+
+
+def get_signature(project):
+    endpoint = f"projects/{project}/labels/Code-Review-Policy"
+    review_label = REST.get(endpoint = endpoint)
+    return review_label['values'][' 0']
 
 
 if __name__ == '__main__':
