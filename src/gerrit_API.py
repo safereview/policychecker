@@ -90,7 +90,7 @@ def create_review_label(project):
 def get_signature(project):
     endpoint = f"projects/{project}/labels/Code-Review-Policy"
     review_label = REST.get(endpoint = endpoint)
-    return review_label['values'][' 0']
+    return review_label['values'][' 0'].encode()
 
 
 if __name__ == '__main__':
