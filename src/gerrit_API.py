@@ -94,13 +94,14 @@ def get_signature(project):
     review_label = REST.get(endpoint = endpoint)
     return review_label['values'][' 0'].encode()
 
+
 # Get the code review policy for the project
 def get_code_review_policy(project):
     project_bh = get_branch_head(project, CONFIG_BRANCH)
     rules_pl = get_blob_content(project, project_bh, 'rules.pl')
-    project_config = get_blob_content(project, project_bh, 'project.config')
-    all_projects_bh = get_branch_head('All-Projects', CONFIG_BRANCH)
-    groups = get_blob_content('All-Projects', all_projects_bh, 'groups')
+    project_config = get_blob_content(project, project_bh, CONFIG_FILE)
+    all_projects_bh = get_branch_head(ALL_PROJECTS, CONFIG_BRANCH)
+    groups = get_blob_content(ALL_PROJECTS, all_projects_bh, CONFIG_GROUP)
     crp = rules_pl + project_config + groups
     return crp.encode()
 
