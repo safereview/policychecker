@@ -2,7 +2,7 @@
 
 # Install: $ pip install pygerrit2
 from pygerrit2 import GerritRestAPI, HTTPBasicAuth
-from gerrit_config import *
+from config.gerrit_config import *
 
 
 # create the REST API call
@@ -87,7 +87,7 @@ def create_review_label(project):
     return REST.put(endpoint = endpoint, data = label)
 
 
-def get_signature(project):
+def get_crp_signature(project):
     endpoint = f"projects/{project}/labels/Code-Review-Policy"
     review_label = REST.get(endpoint = endpoint)
     return review_label['values'][' 0'].encode()

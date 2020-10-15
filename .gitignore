@@ -12,7 +12,7 @@ help/
 lib/
 lib64/
 setup.py
-#src/
+src/internal/
 test/
 var/
 
