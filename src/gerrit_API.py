@@ -3,7 +3,9 @@
 # Install: $ pip install pygerrit2
 from pygerrit2 import GerritRestAPI, HTTPBasicAuth
 from gerrit_config import *
-
+from nacl.encoding import HexEncoder
+from nacl.signing import SigningKey, VerifyKey
+from nacl.exceptions import BadSignatureError
 
 # create the REST API call
 def get_rest_api(username, password, url):
@@ -76,7 +78,7 @@ def get_account_info(aid):
 
 
 # Create a new code review label
-def create_review_label(project):
+def create_review_label(project, crp_signature):
 
     label = {
         'commit_message' : 'Code-Review-Policy',
@@ -90,9 +92,20 @@ def create_review_label(project):
 def get_signature(project):
     endpoint = f"projects/{project}/labels/Code-Review-Policy"
     review_label = REST.get(endpoint = endpoint)
-    return review_label['values'][' 0']
+    return review_label['values'][' 0'].encode()
 
 
+# Get the code review policy for the project
+def get_code_review_policy(project):
+    project_bh = get_branch_head(project, CONFIG_BRANCH)
+    rules_pl = get_blob_content(project, project_bh, 'rules.pl')
+    project_config = get_blob_content(project, project_bh, 'project.config')
+    all_projects_bh = get_branch_head('All-Projects', CONFIG_BRANCH)
+    groups = get_blob_content('All-Projects', all_projects_bh, 'groups')
+    crp = rules_pl + project_config + groups
+    return crp.encode()
+
+    
 if __name__ == '__main__':
     # Gerrit REST API call
     REST = get_rest_api(USER, PASS, url)
@@ -129,3 +142,18 @@ if __name__ == '__main__':
 
     # Print out permissions listed in access rights
     pp.pprint(access_rights['local'])
+
+    # Sign the CRP and store the signature in repo
+    signing_key = SigningKey.generate()
+    crp = get_code_review_policy(project)
+    crp_signature = signing_key.sign(crp, encoder=HexEncoder).decode()
+    create_review_label(project, crp_signature)
+
+    # Retrieve signature from repo and verify
+    verify_key = signing_key.verify_key
+    retrieved_signature = get_signature(project)
+    try:
+        verify_key.verify(retrieved_signature, encoder=HexEncoder)
+        print('Verified Signature')
+    except BadSignatureError:
+        print('Bad Signature')
