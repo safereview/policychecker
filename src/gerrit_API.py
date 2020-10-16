@@ -3,7 +3,9 @@
 # Install: $ pip install pygerrit2
 from pygerrit2 import GerritRestAPI, HTTPBasicAuth
 from config.gerrit_config import *
-
+from nacl.encoding import HexEncoder
+from nacl.signing import SigningKey, VerifyKey
+from nacl.exceptions import BadSignatureError
 
 # create the REST API call
 def get_rest_api(username, password, url):
@@ -76,7 +78,7 @@ def get_account_info(aid):
 
 
 # Create a new code review label
-def create_review_label(project):
+def create_review_label(project, crp_signature):
 
     label = {
         'commit_message' : 'Code-Review-Policy',
@@ -91,6 +93,18 @@ def get_crp_signature(project):
     endpoint = f"projects/{project}/labels/Code-Review-Policy"
     review_label = REST.get(endpoint = endpoint)
     return review_label['values'][' 0'].encode()
+
+
+# Get the code review policy for the project
+def get_code_review_policy(project):
+    cb_head = get_branch_head(project, CONFIG_BRANCH)
+    ap_head = get_branch_head(ALL_PROJECTS, CONFIG_BRANCH)
+
+    rules_pl = get_blob_content(project, cb_head, 'rules.pl')
+    project_config = get_blob_content(project, cb_head, CONFIG_FILE)
+    groups = get_blob_content(ALL_PROJECTS, ap_head, CONFIG_GROUP)
+    crp = rules_pl + project_config + groups
+    return crp.encode()
 
 
 if __name__ == '__main__':
@@ -129,3 +143,18 @@ if __name__ == '__main__':
 
     # Print out permissions listed in access rights
     pp.pprint(access_rights['local'])
+
+    # Sign the CRP and store the signature in repo
+    signing_key = SigningKey.generate()
+    crp = get_code_review_policy(project)
+    crp_signature = signing_key.sign(crp, encoder=HexEncoder).decode()
+    create_review_label(project, crp_signature)
+
+    # Retrieve signature from repo and verify
+    verify_key = signing_key.verify_key
+    retrieved_signature = get_crp_signature(project)
+    try:
+        verify_key.verify(retrieved_signature, encoder=HexEncoder)
+        print('Verified Signature')
+    except BadSignatureError:
+        print('Bad Signature')
