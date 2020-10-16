@@ -2,7 +2,7 @@
 
 # Install: $ pip install pygerrit2
 from pygerrit2 import GerritRestAPI, HTTPBasicAuth
-from gerrit_config import *
+from config.gerrit_config import *
 from nacl.encoding import HexEncoder
 from nacl.signing import SigningKey, VerifyKey
 from nacl.exceptions import BadSignatureError
@@ -89,7 +89,7 @@ def create_review_label(project, crp_signature):
     return REST.put(endpoint = endpoint, data = label)
 
 
-def get_signature(project):
+def get_crp_signature(project):
     endpoint = f"projects/{project}/labels/Code-Review-Policy"
     review_label = REST.get(endpoint = endpoint)
     return review_label['values'][' 0'].encode()
@@ -97,15 +97,16 @@ def get_signature(project):
 
 # Get the code review policy for the project
 def get_code_review_policy(project):
-    project_bh = get_branch_head(project, CONFIG_BRANCH)
-    rules_pl = get_blob_content(project, project_bh, 'rules.pl')
-    project_config = get_blob_content(project, project_bh, CONFIG_FILE)
-    all_projects_bh = get_branch_head(ALL_PROJECTS, CONFIG_BRANCH)
-    groups = get_blob_content(ALL_PROJECTS, all_projects_bh, CONFIG_GROUP)
+    cb_head = get_branch_head(project, CONFIG_BRANCH)
+    ap_head = get_branch_head(ALL_PROJECTS, CONFIG_BRANCH)
+
+    rules_pl = get_blob_content(project, cb_head, 'rules.pl')
+    project_config = get_blob_content(project, cb_head, CONFIG_FILE)
+    groups = get_blob_content(ALL_PROJECTS, ap_head, CONFIG_GROUP)
     crp = rules_pl + project_config + groups
     return crp.encode()
 
-    
+
 if __name__ == '__main__':
     # Gerrit REST API call
     REST = get_rest_api(USER, PASS, url)
@@ -151,7 +152,7 @@ if __name__ == '__main__':
 
     # Retrieve signature from repo and verify
     verify_key = signing_key.verify_key
-    retrieved_signature = get_signature(project)
+    retrieved_signature = get_crp_signature(project)
     try:
         verify_key.verify(retrieved_signature, encoder=HexEncoder)
         print('Verified Signature')
