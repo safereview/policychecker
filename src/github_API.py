@@ -2,7 +2,7 @@
 
 # Install: $ pip install PyGithub
 from github import Github
-from github_config import *
+from configs.github_config import *
 
 
 # Get a list of branches

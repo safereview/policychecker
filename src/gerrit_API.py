@@ -1,11 +1,14 @@
-#TODO: Add requirements to support f strings 
+#TODO: Add requirements to
+#   - Support f strings 
+#   - Add prerequisites
+#       - pip install pygerrit2
+#       - pip install PyNaCl
 
-# Install: $ pip install pygerrit2
 from pygerrit2 import GerritRestAPI, HTTPBasicAuth
-from gerrit_config import *
-from nacl.encoding import HexEncoder
-from nacl.signing import SigningKey, VerifyKey
-from nacl.exceptions import BadSignatureError
+
+from configs.gerrit_config import *
+from utils import file_path_trim
+from crypto_manager import *
 
 # create the REST API call
 def get_rest_api(username, password, url):
@@ -46,9 +49,19 @@ def get_branch_head(project, branch):
 
     return head
 
-# Get a Git blog object
+
+# Get a file content
 def get_blob_content(project, head, fname):
-    endpoint = f"projects/{project}/commits/{head}/files/{fname}"
+    # Replace / in fname with %2F
+    fname = file_path_trim(fname)
+    # Form the endpoint
+    endpoint = f"projects/{project}/commits/{head}/files/{fname}/content"
+    return REST.get(endpoint = endpoint)
+
+
+# List files per commit
+def list_files(project, head):
+    endpoint = f"projects/{project}/commits/{head}/files/"
     return REST.get(endpoint = endpoint)
 
 
@@ -77,9 +90,8 @@ def get_account_info(aid):
     return REST.get(endpoint = endpoint)
 
 
-# Create a new code review label
-def create_review_label(project, crp_signature):
-
+# Store the crp signature as review label on the server
+def store_crp_signature(project, crp_signature):
     label = {
         'commit_message' : 'Code-Review-Policy',
         'values' : { '0' : crp_signature }
@@ -89,27 +101,45 @@ def create_review_label(project, crp_signature):
     return REST.put(endpoint = endpoint, data = label)
 
 
-def get_signature(project):
+# Retrive the crp signature from the server
+def get_crp_signature(project):
     endpoint = f"projects/{project}/labels/Code-Review-Policy"
     review_label = REST.get(endpoint = endpoint)
     return review_label['values'][' 0'].encode()
 
 
-# Get the code review policy for the project
-def get_code_review_policy(project):
-    project_bh = get_branch_head(project, CONFIG_BRANCH)
-    rules_pl = get_blob_content(project, project_bh, 'rules.pl')
-    project_config = get_blob_content(project, project_bh, CONFIG_FILE)
-    all_projects_bh = get_branch_head(ALL_PROJECTS, CONFIG_BRANCH)
-    groups = get_blob_content(ALL_PROJECTS, all_projects_bh, CONFIG_GROUP)
-    crp = rules_pl + project_config + groups
+# Retrive the code review policy from the server
+def get_crp(project):
+    # TODO: Update the retrieval function
+    # Now: Assume that any project inherits the
+    # entire code review policy from ALL_PROJECTS
+    # Later: Check if a project has its own crp
+
+    #cb_head = get_branch_head(project, CONFIG_BRANCH)
+    ap_head = get_branch_head(ALL_PROJECTS, CONFIG_BRANCH)
+
+    rules_pl = ''
+    project_config = ''
+    groups = ''
+    try:
+        # rules.pl is not created by default. It is 
+        # available only if there is a customized rule.
+        rules_pl = get_blob_content(ALL_PROJECTS, ap_head, 'rules.pl')
+        groups = get_blob_content(ALL_PROJECTS, ap_head, CONFIG_GROUP)
+        project_config = get_blob_content(ALL_PROJECTS, ap_head, CONFIG_FILE)
+    except Exception:
+        pass
+
+    crp = f"{rules_pl}{project_config}{groups}"
     return crp.encode()
 
-    
+
 if __name__ == '__main__':
     # Gerrit REST API call
     REST = get_rest_api(USER, PASS, url)
 
+    '''
+    NOTE: Some Gerrit API examples:
     # Prepare pprint
     import pprint
     pp = pprint.PrettyPrinter(indent=4)
@@ -126,10 +156,6 @@ if __name__ == '__main__':
     account = get_account_info(get_account_id('r1'))
     print(account)
 
-    # Get head of the branch
-    branch_head = get_branch_head(project, CONFIG_BRANCH)
-    print(branch_head)
-
     # Get info about the access rights
     access_rights = get_access_rights(project)
     access_rights = access_rights["All-Projects"]
@@ -142,18 +168,14 @@ if __name__ == '__main__':
 
     # Print out permissions listed in access rights
     pp.pprint(access_rights['local'])
+    '''
 
-    # Sign the CRP and store the signature in repo
-    signing_key = SigningKey.generate()
-    crp = get_code_review_policy(project)
-    crp_signature = signing_key.sign(crp, encoder=HexEncoder).decode()
-    create_review_label(project, crp_signature)
+    # Retrieve CRP, Sign it, Store the signature in repo
+    crp = get_crp(project)
+    verify_key, crp_signature = compute_signature(crp)
+    res = store_crp_signature(project, crp_signature)
 
-    # Retrieve signature from repo and verify
-    verify_key = signing_key.verify_key
-    retrieved_signature = get_signature(project)
-    try:
-        verify_key.verify(retrieved_signature, encoder=HexEncoder)
-        print('Verified Signature')
-    except BadSignatureError:
-        print('Bad Signature')
+    # Retrieve CRP signature, Verify it
+    retrieved_signature = get_crp_signature(project)
+    res = verify_signature(retrieved_signature, verify_key)
+    print(res)

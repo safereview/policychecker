@@ -4,7 +4,7 @@ __pycache__/
 
 # Distribution / packaging
 .Python
-#docs/
+docs/
 env/
 build/
 dist/
@@ -12,7 +12,8 @@ help/
 lib/
 lib64/
 setup.py
-#src/
+src/internal/
+src/configs
 test/
 var/
 
