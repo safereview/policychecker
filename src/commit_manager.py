@@ -44,7 +44,6 @@ def github_extract_merge_request_commits(repo, commit):
         
         for id in merge_commit_ids:
             merge_commits.append(repo.commit(id))
-        merge_commits.append(common_ancestor)
 
     return merge_commits
 
