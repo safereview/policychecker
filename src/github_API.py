@@ -73,6 +73,12 @@ def create_status_check(g, user, repo, sha):
 	)
 	return res
 
+def grab_status_check_signature(g, user, repo, sha):
+	repo_name = "{}/{}".format(user, repo)
+	repo = g.get_repo(repo_name)
+	res = repo.get_commit(sha=sha)
+	return res.commit.description
+
 
 def get_crp(g, user, repo, branch):
 
@@ -114,12 +120,13 @@ if __name__ == '__main__':
 	# Retrieve CRP, Sign It and Store  
 	crp = get_crp(REST, USER, repo, "master")
 	verify_key, crp_signature = compute_signature(crp)
-	stored_crp = create_status_check(REST, USER, repo, crp_signature)
+	stored_crp = create_status_check(REST, USER, repo, 'HEAD')
 
 	# Retrieve CRP signature, Verify it
-	# retrieved_signature = get_crp_signature_remote()
-    # res = verify_signature(retrieved_signature, verify_key)
+	retrieved_signature = grab_status_check_signature(REST, USER, repo, "HEAD")
+	res = verify_signature(retrieved_signature, verify_key)
 
 
 	print(f"Verify:{verify_key}\ncrp_signature:{crp_signature}")
 	print(stored_crp)
+	print(res)
