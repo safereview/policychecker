@@ -37,6 +37,7 @@ def github_extract_merge_request_commits(repo, commit):
     elif merge_policy == 'DirectPush':
         return commit
     elif merge_policy == 'Merge':
+        merge_commits.append(commit)
         first_parent = commit.parents[0]
         second_parent = commit.parents[1]
         common_ancestor = repo.merge_base(first_parent, second_parent)[0]
