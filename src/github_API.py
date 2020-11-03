@@ -30,6 +30,7 @@ def get_crp_signature_remote(status_check):
 	return status_check.description
 
 def get_crp_signature_local():
+	# Jank Plaintext
 	return crp_signature
 
 # Get Protection Status of that Branch
@@ -43,11 +44,10 @@ def get_branch_protection_status(g, user, repo, branch):
 			return True
 		else:
 			return False  
-	except:
-		return False
+	except Exception as e:
+		SystemExit(e)
 
 	
-
 # See required status checks of branch
 def get_required_branch_protection_checks(g, user, repo, branch):
 	repo_name = "{}/{}".format(user, repo)
@@ -73,19 +73,22 @@ def create_status_check(g, user, repo, sha):
 	)
 	return res
 
-def store_crp_signature(g, user, repo, sha, crp_sig):
-	repo_name = "{}/{}".format(user, repo)
-	repo = g.get_repo(repo_name)
-	res = repo.get_commit(sha=sha).create_status(
-		state = "success",
-		context = "CODE_REVIEW_POLICY",
-		description = crp_sig,
-	)
-	return res
 
-# Compare the signatures of the crp
-cmp_crp = lambda local_crp, remote_crp: True if local_crp == remote_crp else False
+def get_crp(g, user, repo, branch):
 
+	gitattr = ""
+	codeowners = ""
+	branch_prot_rules = ""
+
+	try:
+		branch_prot_rules = get_required_branch_protection_checks(g, user, repo, branch)
+		codeowners = get_blob_content(g, user, repo, ".github/CODEOWNERS")
+		gitattr = get_blob_content(REST, USER, repo, ".git/info/attributesa")
+	except Exception:
+		pass
+
+	crp = f"[{branch_prot_rules},{codeowners},{gitattr}]"
+	return crp.encode() # Needs to be in (bytes) in order to be put into the compute func
 
 if __name__ == '__main__':
 	# GitHub REST API call
@@ -95,29 +98,28 @@ if __name__ == '__main__':
 	branches = get_branches (REST, USER, repo)
 	branch = get_branch (REST, USER, repo, "master")
 	branch_head = get_branch_head(REST, USER, repo, "master")
-	crp_sig = create_status_check(REST, USER, repo, 'HEAD')
+	crp_sig = create_status_check(REST, USER, repo, 'HEAD')   # how you store the crp_signature
 
 	# Print out results
-	print(branch_head)
-	print(branch)
-	print(branches)
-	print(crp_sig)
-
-	# Get local crp signature from status check
-	local_crp_sig = get_crp_signature_local()
-	print(local_crp_sig)  
-
-	# Retrieve crp_signature from API
-	remote_crp_sig = get_crp_signature_remote(crp_sig)
-	print(remote_crp_sig)
-
-	# Retrieve CRP, Sign it, Store the signature in repo
-	valid_crp = cmp_crp(local_crp_sig, remote_crp_sig)
-	store_crp_signature(REST, USER, repo, 'HEAD', local_crp_sig)
+	print(f"{branch_head},\n\t {type(branch_head)}")
+	print(f"{branch},\n\t {type(branch)}")
+	print(f"{branches},\n\t {type(branches)}")
+	print(f"{crp_sig},\n\t {type(crp_sig)}")
 
 
-	
-	if(valid_crp):
-		print("The local hash is equal to the remote hash.")
-	else:
-		print("Data has been tempered with.")
+	# Get Branch Protections
+	branch_prot = get_required_branch_protection_checks(REST, USER, repo, 'master')
+	# print(branch_prot)
+
+	# Retrieve CRP, Sign It and Store  
+	crp = get_crp(REST, USER, repo, "master")
+	verify_key, crp_signature = compute_signature(crp)
+	stored_crp = create_status_check(REST, USER, repo, crp_signature)
+
+	# Retrieve CRP signature, Verify it
+	# retrieved_signature = get_crp_signature_remote()
+    # res = verify_signature(retrieved_signature, verify_key)
+
+
+	print(f"Verify:{verify_key}\ncrp_signature:{crp_signature}")
+	print(stored_crp)
