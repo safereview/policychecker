@@ -62,22 +62,26 @@ def get_blob_content(g, user, repo, path):
 
 
 # Create a status check
-def create_status_check(g, user, repo, sha):
+def create_status_check(g, user, repo, sha, _crp_signature):
 	repo_name = "{}/{}".format(user, repo)
 	repo = g.get_repo(repo_name)
 	res = repo.get_commit(sha=sha).create_status(
 		state = "success",
 		#target_url="https://myURL.com",
 		context = "CODE_REVIEW_POLICY",
-		description = crp_signature
+		description = _crp_signature
 	)
 	return res
 
 def grab_status_check_signature(g, user, repo, sha):
 	repo_name = "{}/{}".format(user, repo)
 	repo = g.get_repo(repo_name)
-	res = repo.get_commit(sha=sha)
-	return res.commit.description
+	stati = repo.get_commit(sha=sha).get_statuses()
+	_list = list()
+	for obj in stati:
+		_list.append(obj)
+		return _list[0].description  # get latest status check
+		# print(f"{obj}\n\t{type(obj)}")
 
 
 def get_crp(g, user, repo, branch):
@@ -88,8 +92,8 @@ def get_crp(g, user, repo, branch):
 
 	try:
 		branch_prot_rules = get_required_branch_protection_checks(g, user, repo, branch)
-		codeowners = get_blob_content(g, user, repo, ".github/CODEOWNERS")
-		gitattr = get_blob_content(REST, USER, repo, ".git/info/attributesa")
+		codeowners = get_blob_content(g, user, repo, CODEOWNERS)
+		gitattr = get_blob_content(REST, USER, repo, ".git/info/attributes")
 	except Exception:
 		pass
 
@@ -100,33 +104,34 @@ if __name__ == '__main__':
 	# GitHub REST API call
 	REST = Github(TOKEN)
 
+	"""
 	# Try out some APIs
 	branches = get_branches (REST, USER, repo)
 	branch = get_branch (REST, USER, repo, "master")
 	branch_head = get_branch_head(REST, USER, repo, "master")
-	crp_sig = create_status_check(REST, USER, repo, 'HEAD')   # how you store the crp_signature
+	crp_sig = create_status_check(REST, USER, repo, 'HEAD', crp_signature)   # how you store the crp_signature
 
 	# Print out results
 	print(f"{branch_head},\n\t {type(branch_head)}")
 	print(f"{branch},\n\t {type(branch)}")
 	print(f"{branches},\n\t {type(branches)}")
 	print(f"{crp_sig},\n\t {type(crp_sig)}")
-
-
+	# print("\n")
+	"""
 	# Get Branch Protections
 	branch_prot = get_required_branch_protection_checks(REST, USER, repo, 'master')
-	# print(branch_prot)
+	print(branch_prot)
 
 	# Retrieve CRP, Sign It and Store  
 	crp = get_crp(REST, USER, repo, "master")
-	verify_key, crp_signature = compute_signature(crp)
-	stored_crp = create_status_check(REST, USER, repo, 'HEAD')
+	verify_key, crp_sign = compute_signature(crp)
+	stored = create_status_check(REST, USER, repo, 'HEAD', crp_sign[:140]) 
 
-	# Retrieve CRP signature, Verify it
-	retrieved_signature = grab_status_check_signature(REST, USER, repo, "HEAD")
+    # Retrieve CRP signature, Verify it
+	retrieved_signature = grab_status_check_signature(REST, USER, repo, 'HEAD')
 	res = verify_signature(retrieved_signature, verify_key)
-
-
-	print(f"Verify:{verify_key}\ncrp_signature:{crp_signature}")
-	print(stored_crp)
 	print(res)
+
+	#print(f"Verify:{verify_key}\n\ncrp_signature:{crp_sign}")
+	#print(f"\n{crp_sign[:140]}\n")
+	#print(retrieved_signature)
