@@ -9,6 +9,7 @@ def gpg_sign(message):
     # TODO: Make it work for any condition in particular
     # when there is no existing keys at ~/.gnupg/
     GPGHOME = '/home/hmd/.gnupg'
+    #'C:\\Users\\hye\\.gnupg'
     gpg = GPG(gnupghome=GPGHOME)
     return gpg.sign(message)
 
