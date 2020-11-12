@@ -25,14 +25,6 @@ def get_branch_head(g, user, repo, branch):
 	branch = g.get_repo(repo_name).get_branch(branch)
 	return branch.commit
 
-# Get the crp signature from the the status check
-def get_crp_signature_remote(status_check):
-	return status_check.description
-
-def get_crp_signature_local():
-	# Jank Plaintext
-	return crp_signature
-
 # Get Protection Status of that Branch
 def get_branch_protection_status(g, user, repo, branch):
 	# The Protection Status will either go to True or an Error, must debug for future 
@@ -52,7 +44,7 @@ def get_branch_protection_status(g, user, repo, branch):
 def get_required_branch_protection_checks(g, user, repo, branch):
 	repo_name = "{}/{}".format(user, repo)
 	branch =  g.get_repo(repo_name).get_branch(branch)
-	return branch.get_required_status_checks()
+	return branch.get_protection()
 
 
 # Get file content
@@ -120,7 +112,7 @@ if __name__ == '__main__':
 	"""
 	# Get Branch Protections
 	branch_prot = get_required_branch_protection_checks(REST, USER, repo, 'master')
-	print(branch_prot)
+	#print(branch_prot)
 
 	# Retrieve CRP, Sign It and Store  
 	crp = get_crp(REST, USER, repo, "master")
@@ -130,8 +122,8 @@ if __name__ == '__main__':
     # Retrieve CRP signature, Verify it
 	retrieved_signature = grab_status_check_signature(REST, USER, repo, 'HEAD')
 	res = verify_signature(retrieved_signature, verify_key)
-	print(res)
+	#print(res)
 
-	#print(f"Verify:{verify_key}\n\ncrp_signature:{crp_sign}")
+	print(f"\nVerify:{verify_key}\n\ncrp_signature:{crp_sign}")
 	#print(f"\n{crp_sign[:140]}\n")
 	#print(retrieved_signature)
