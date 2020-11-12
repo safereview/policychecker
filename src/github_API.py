@@ -1,5 +1,3 @@
-#TODO: Add requirements to support f strings 
-
 # Install: $ pip install PyGithub
 from github import Github
 from configs.github_config import *
@@ -8,27 +6,28 @@ from crypto_manager import *
 
 # Get a list of branches
 def get_branches(g, user, repo):
-	repo_name = "{}/{}".format(user, repo)
+	repo_name = f"{user}/{repo}"
 	repo = g.get_repo(repo_name)	
 	return list(repo.get_branches())
 
 
 # Get info about a branch
 def get_branch(g, user, repo, branch):
-	repo_name = "{}/{}".format(user, repo)
+	repo_name = f"{user}/{repo}"
 	return g.get_repo(repo_name).get_branch(branch)
 
 
 # Get the head of a branch
 def get_branch_head(g, user, repo, branch):
-	repo_name = "{}/{}".format(user, repo)
+	repo_name = f"{user}/{repo}"
 	branch = g.get_repo(repo_name).get_branch(branch)
 	return branch.commit
+
 
 # Get Protection Status of that Branch
 def get_branch_protection_status(g, user, repo, branch):
 	# The Protection Status will either go to True or an Error, must debug for future 
-	repo_name = "{}/{}".format(user, repo)
+	repo_name = f"{user}/{repo}"
 	try:
 		branch = g.get_repo(repo_name).get_branch(branch)
 		branch_prot = branch.protected
@@ -42,31 +41,32 @@ def get_branch_protection_status(g, user, repo, branch):
 	
 # See required status checks of branch
 def get_required_branch_protection_checks(g, user, repo, branch):
-	repo_name = "{}/{}".format(user, repo)
+	repo_name = f"{user}/{repo}"
 	branch =  g.get_repo(repo_name).get_branch(branch)
 	return branch.get_protection()
 
 
 # Get file content
 def get_blob_content(g, user, repo, path):
-	repo_name = "{}/{}".format(user, repo)
+	repo_name = f"{user}/{repo}"
 	return g.get_repo(repo_name).get_contents(path).decoded_content
 
 
 # Create a status check
-def create_status_check(g, user, repo, sha, _crp_signature):
+def create_status_check(g, user, repo, sha, signature):
 	repo_name = "{}/{}".format(user, repo)
 	repo = g.get_repo(repo_name)
 	res = repo.get_commit(sha=sha).create_status(
 		state = "success",
 		#target_url="https://myURL.com",
 		context = "CODE_REVIEW_POLICY",
-		description = _crp_signature
+		description = signature
 	)
 	return res
 
+# grabs the latest status check 
 def grab_status_check_signature(g, user, repo, sha):
-	repo_name = "{}/{}".format(user, repo)
+	repo_name = f"{user}/{repo}"
 	repo = g.get_repo(repo_name)
 	stati = repo.get_commit(sha=sha).get_statuses()
 	_list = list()
@@ -80,12 +80,12 @@ def get_crp(g, user, repo, branch):
 
 	gitattr = ""
 	codeowners = ""
-	branch_prot_rules = ""
+	branch_prot_rules = ""   # <--- replace line with content on form_protection_rules.py
 
 	try:
-		branch_prot_rules = get_required_branch_protection_checks(g, user, repo, branch)
-		codeowners = get_blob_content(g, user, repo, CODEOWNERS)
 		gitattr = get_blob_content(REST, USER, repo, ".git/info/attributes")
+		codeowners = get_blob_content(g, user, repo, CODEOWNERS)
+		branch_prot_rules = get_required_branch_protection_checks(g, user, repo, branch)
 	except Exception:
 		pass
 
@@ -127,3 +127,4 @@ if __name__ == '__main__':
 	print(f"\nVerify:{verify_key}\n\ncrp_signature:{crp_sign}")
 	#print(f"\n{crp_sign[:140]}\n")
 	#print(retrieved_signature)
+	#print(get_branches(REST, USER, repo))
