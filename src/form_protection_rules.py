@@ -4,6 +4,7 @@ import json
 import requests
 import re
 
+ACCEPT = '"Accept" : "application/vnd.github.luke-cage-preview+json"'
 
 # Most recent 'Accept' : https://developer.github.com/changes/2018-03-16-protected-branches-required-approving-reviews/
 # TODO
@@ -13,12 +14,12 @@ import re
 Understand how the data should be printed to the screen
     # Get list of branches
     # Get a specific branch
-        Get Require Pull request reviews before merging
-            --> Required Approving reviews => num
-            Dismiss stale pull request approvals when new commits are pushed
-            Require review from Code Owners
+        #Get Require Pull request reviews before merging
+            # --> Required Approving reviews => num
+            #Dismiss stale pull request approvals when new commits are pushed
+            #Require review from Code Owners
         #Require Status Checks to pass before merging
-            Require branch to be up to date before merging
+            #Require branch to be up to date before merging
         # Require Signed Commits
         # Require linear history
         # Include administrators (Enfore admin)
@@ -51,14 +52,14 @@ def require_pull_request_reviews(user, repo, branch_name):
         response = requests.get(f"https://api.github.com/repos/{user}/{repo}/branches/{branch_name}/protection", headers={'Authorization': f"token {TOKEN}","Accept" : "application/vnd.github.luke-cage-preview+json"})
         if(response.ok):
             resp_dump = json.dumps(response.json())  # str of the json object
+
             dismiss_stale = bool(re.search('"dismiss_stale_reviews": true', resp_dump)) 
             require_codeowners = bool(re.search('"require_code_owner_reviews": true', resp_dump))
             review_count = int(re.search('"required_approving_review_count": \d', resp_dump).group()[-1]) # gets the number count
-
             return "{True, dismiss_stale_pull_requests: %r, require_review_from_codeowners: %r, required_review_count: %d}" % (dismiss_stale, require_codeowners, review_count)
         return True
         
-    except KeyError:
+    except Exception:
         return False
 
 
@@ -99,16 +100,17 @@ def allow_deletions(user, repo, branch_name):
 # Functions to get all of the protections
 #============================================================================================================================================
 def get_full_branch_protection(g, user, repo, branch_name):
+    response = requests.get(f"https://api.github.com/repos/{user}/{repo}/branches/{branch_name}/protection", headers={'Authorization': f"token {TOKEN}", "Accept" : "application/vnd.github.luke-cage-preview+json" })
     pass
 
 
 def list_all_branch_protections(g, user, repo):
     branches = g.get_repo(f"{user}/{repo}").get_branches()
-    print(branches)
+    for branch in branches:
+        print(branch.name)
+        print("=" * 30)
+        get_full_branch_protection(g, user, repo, branch.name)
 
-
-def make_dictionary():
-    pass
 
 # Driver
 #============================================================================================================================================
@@ -143,6 +145,7 @@ allow_deletions:\t\t{deletions}
 """
         )   # -> Require_signed_commits: True
 
+    list_all_branch_protections(REST, USER, repo)
 # When done, update PR and let Hammad know
 # Ensure that Hammad is updated with current progress and jazzy stuff issues when needed
 
