@@ -137,7 +137,7 @@ def get_full_branch_protection(g, user, repo, branch_name):
     return ret_dict
 
 
-def full_branch_protections(g, user, repo):
+def project_full_branch_protections(g, user, repo):
     full_prot_dict = {}
     branches = g.get_repo(f"{user}/{repo}").get_branches()
     for branch in branches:
@@ -155,7 +155,6 @@ if __name__ == '__main__':
     branch_name = "dev"
 
     dev_branch = get_branch(REST, USER, repo, branch_name)
-
     # Inefficient to call them one by one
 
     # Func Calls
@@ -183,4 +182,4 @@ if __name__ == '__main__':
 # When done, update PR and let Hammad know
 
 
-    print(full_branch_protections(REST, USER, repo))
+    print(project_full_branch_protections(REST, USER, repo))

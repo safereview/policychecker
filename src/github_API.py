@@ -2,7 +2,7 @@
 from github import Github
 from configs.github_config import *
 from crypto_manager import *
-
+from form_protection_rules import *
 
 # Get a list of branches
 def get_branches(g, user, repo):
@@ -76,17 +76,28 @@ def grab_status_check_signature(g, user, repo, sha):
 		# print(f"{obj}\n\t{type(obj)}")
 
 
-def get_crp(g, user, repo, branch):
+def get_crp(g, user, repo, branch_name):
 
 	gitattr = ""
 	codeowners = ""
-	branch_prot_rules = ""   # <--- replace line with content on form_protection_rules.py
+	branch_prot_rules = {}   # <--- replace line with content on form_protection_rules.py
 
 	try:
 		gitattr = get_blob_content(REST, USER, repo, ".git/info/attributes")
-		codeowners = get_blob_content(g, user, repo, CODEOWNERS)
-		branch_prot_rules = get_required_branch_protection_checks(g, user, repo, branch)
 	except Exception:
+		# print("error in gitattr")
+		pass
+
+	try:
+		codeowners = get_blob_content(g, user, repo, CODEOWNERS)
+	except Exception:
+		# print("error in codeowners")
+		pass
+
+	try:
+		branch_prot_rules = get_full_branch_protection(g, user, repo, branch_name)
+	except Exception:
+		# print("error in protections")
 		pass
 
 	crp = f"[{branch_prot_rules},{codeowners},{gitattr}]"
@@ -95,6 +106,8 @@ def get_crp(g, user, repo, branch):
 if __name__ == '__main__':
 	# GitHub REST API call
 	REST = Github(TOKEN)
+
+	branch_name = "dev"
 
 	"""
 	# Try out some APIs
@@ -111,11 +124,11 @@ if __name__ == '__main__':
 	# print("\n")
 	"""
 	# Get Branch Protections
-	branch_prot = get_required_branch_protection_checks(REST, USER, repo, 'master')
+	branch_prot = get_required_branch_protection_checks(REST, USER, repo,branch_name)
 	#print(branch_prot)
 
 	# Retrieve CRP, Sign It and Store  
-	crp = get_crp(REST, USER, repo, "master")
+	crp = get_crp(REST, USER, repo, branch_name)
 	verify_key, crp_sign = compute_signature(crp)
 	stored = create_status_check(REST, USER, repo, 'HEAD', crp_sign[:140]) 
 
@@ -127,4 +140,5 @@ if __name__ == '__main__':
 	print(f"\nVerify:{verify_key}\n\ncrp_signature:{crp_sign}")
 	#print(f"\n{crp_sign[:140]}\n")
 	#print(retrieved_signature)
+	# print(get_full_branch_protection(REST, USER, repo, "dev"))
 	#print(get_branches(REST, USER, repo))
