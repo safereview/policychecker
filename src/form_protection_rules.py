@@ -1,8 +1,11 @@
 from github import Github
 from configs.github_config import *
 import json
-import requests as re
+import requests
+import re
 
+
+# Most recent 'Accept' : https://developer.github.com/changes/2018-03-16-protected-branches-required-approving-reviews/
 # TODO
 """
 ## DOCS: https://github.com/PyGithub/PyGithub/blob/master/github/Branch.pyi
@@ -17,7 +20,7 @@ Understand how the data should be printed to the screen
         #Require Status Checks to pass before merging
             Require branch to be up to date before merging
         # Require Signed Commits
-        Require linear history
+        # Require linear history
         # Include administrators (Enfore admin)
 """
 
@@ -33,7 +36,7 @@ def get_branch(g, user, repo, branch):
 
 # Reusable Boiler Plate Code to get some
 def re_boiler(user, repo, branch_name):
-    response = re.get(f"https://api.github.com/repos/{user}/{repo}/branches/{branch_name}/protection", headers={'Authorization': f"token {TOKEN}"})
+    response = requests.get(f"https://api.github.com/repos/{user}/{repo}/branches/{branch_name}/protection", headers={'Authorization': f"token {TOKEN}"})
     if(response.ok):
         return json.loads(response.content) # Returns the content of the json reply if "ok"
 
@@ -43,36 +46,34 @@ def re_boiler(user, repo, branch_name):
 # Protect matching branches
 #---------------------------------------------------------------------------
 
-def require_pull_request_reviews(branch):
-    return branch.get_required_pull_request_reviews()
-
-    #dev branch and check the branch
-    # --> Got got to issue with the require pull request review
-    # https://docs.github.com/en/free-pro-team@latest/rest/reference/repos#get-branch-protection
-    # We may have an issue and that will be taken care of later
-
-    # count, require_code.., required, status checks, 
-    # Filled out in Dictioanry
-    # count = branch.get_required_pull_request_reviews().required_approving_review_count
-    # print(f"\t\t\tcount:{count}\n")
+def require_pull_request_reviews(user, repo, branch_name):
     try:
-        return branch.get_required_pull_request_reviews() # (ret) RequiredPullRequestReviews(url="https://api.github.com/repos/AOrps/rebxlance/branches/dev/protection/required_pull_request_reviews", require_code_owner_reviews=False, dismiss_stale_reviews=False)
-    except Exception as e:
-        print(e)
+        response = requests.get(f"https://api.github.com/repos/{user}/{repo}/branches/{branch_name}/protection", headers={'Authorization': f"token {TOKEN}","Accept" : "application/vnd.github.luke-cage-preview+json"})
+        if(response.ok):
+            resp_dump = json.dumps(response.json())  # str of the json object
+            dismiss_stale = bool(re.search('"dismiss_stale_reviews": true', resp_dump)) 
+            require_codeowners = bool(re.search('"require_code_owner_reviews": true', resp_dump))
+            review_count = int(re.search('"required_approving_review_count": \d', resp_dump).group()[-1]) # gets the number count
+
+            return "{True, dismiss_stale_pull_requests: %r, require_review_from_codeowners: %r, required_review_count: %d}" % (dismiss_stale, require_codeowners, review_count)
+        return True
+        
+    except KeyError:
         return False
 
 
-
-def require_status_checks(branch):
-    return branch.get_required_status_checks()
-    # try:
-    #     # print(branch.get_required_status_checks())
-    #     status_checks_enabled = branch.get_required_status_checks()
-    # except Exception as e:
-    #     print(f"{e}: {type(e)} \t\t {str(e)}")
-    #     if( str(e) == '404 {"message": "Required status checks not enabled", "documentation_url": "https://docs.github.com/rest/reference/repos#get-status-checks-protection"}'):
-    #         print("cdas")
-    #         return False
+def require_status_checks(g, user, repo, branch_name):
+    response = requests.get(f"https://api.github.com/repos/{user}/{repo}/branches/{branch_name}", headers={'Authorization': f"token {TOKEN}"})
+    if(response.ok):
+        stat_check_prot = json.loads(response.content)["protection"]["required_status_checks"]["enforcement_level"] # requests for branch to determine if it is enabled
+        if(stat_check_prot == "off"):
+            return False
+        else:
+            branch = get_branch(g, user, repo, branch_name)
+            check_strict = re.search("strict=True",str(branch.get_required_status_checks()))
+            if(check_strict == None):
+                return "{True, strict: False}"
+            return "{True, strict: True}"
 
 def signed_commits(branch):
     return branch.get_required_signatures()
@@ -106,31 +107,44 @@ def list_all_branch_protections(g, user, repo):
     print(branches)
 
 
+def make_dictionary():
+    pass
+
 # Driver
 #============================================================================================================================================
 
 if __name__ == '__main__':
     REST = Github(TOKEN)
 
-    dev_branch = get_branch(REST, USER, repo, "dev")
+    branch_name = "dev"
 
-    pull_request_review = require_pull_request_reviews(dev_branch)
-    require_stat_check = "A" #require_status_checks(dev_branch)
+    dev_branch = get_branch(REST, USER, repo, branch_name)
+
+    # Func Calls
+    pull_request_review = require_pull_request_reviews(USER, repo, branch_name)
+    require_stat_check = require_status_checks(REST, USER, repo, branch_name)      
     sign = signed_commits(dev_branch)
+    linear = linear_history(USER, repo,branch_name)
     admin_enforce = include_admin(dev_branch)
+    fpush = allow_force_pushes(USER, repo, branch_name)
+    deletions = allow_deletions(USER, repo, branch_name)
 
+
+    # prints
     print(f"dev_branch:{dev_branch}\n")
     print(f"""\
-Require_pull_request_rev:\t{pull_request_review}
-Require_status+checks:\t\t{require_stat_check}
-Require_signed_commits:\t\t{sign}
-Include_Administrators:\t\t{admin_enforce}
+require_pull_request_rev:\t{pull_request_review}
+require_status+checks:\t\t{require_stat_check}
+require_signed_commits:\t\t{sign}
+require_linear_history:\t\t{linear}
+include_administrators:\t\t{admin_enforce}
+allow_force_pushes:\t\t{fpush}
+allow_deletions:\t\t{deletions}
 """
         )   # -> Require_signed_commits: True
 
 # When done, update PR and let Hammad know
 # Ensure that Hammad is updated with current progress and jazzy stuff issues when needed
-    print(allow_force_pushes(USER, repo, branch_name="dev"))
 
 
     # list_all_branch_protections(REST, USER, repo)
