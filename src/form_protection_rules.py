@@ -7,14 +7,6 @@ import json
 import requests
 import re   
 
-# Most recent 'Accept' : https://developer.github.com/changes/2018-03-16-protected-branches-required-approving-reviews/
-ACCEPT = '"Accept" : "application/vnd.github.luke-cage-preview+json"'
-
-# TODO
-"""
-## DOCS: https://github.com/PyGithub/PyGithub/blob/master/github/Branch.pyi
-
-"""
 
 # Helper Functions
 #============================================================================================================================================
@@ -91,7 +83,7 @@ def allow_deletions(user, repo, branch_name):
 # Functions to get all of the protections
 #============================================================================================================================================
 def get_full_branch_protection(g, user, repo, branch_name):
-    ret_dict = dict()
+    ret_dict = dict()    # ret_dict is just the return dictionary that will have the status of each branch
     prot_resp = requests.get(f"https://api.github.com/repos/{user}/{repo}/branches/{branch_name}/protection", headers={'Authorization': f"token {TOKEN}", "Accept" : "application/vnd.github.luke-cage-preview+json" })
     branch_resp = requests.get(f"https://api.github.com/repos/{user}/{repo}/branches/{branch_name}", headers={'Authorization': f"token {TOKEN}", "Accept" : "application/vnd.github.luke-cage-preview+json" })
 
@@ -132,7 +124,6 @@ def get_full_branch_protection(g, user, repo, branch_name):
             ret_dict['require_status_checks'] = {}
             ret_dict['require_status_checks']['enabled'] = True
             ret_dict['require_status_checks']['strict'] = check_strict
-
 
     return ret_dict
 
@@ -178,8 +169,5 @@ if __name__ == '__main__':
     #     allow_force_pushes:\t\t{fpush}
     #     allow_deletions:\t\t{deletions}
     #     """)  
-
-# When done, update PR and let Hammad know
-
 
     print(project_full_branch_protections(REST, USER, repo))

@@ -80,7 +80,7 @@ def get_crp(g, user, repo, branch_name):
 
 	gitattr = ""
 	codeowners = ""
-	branch_prot_rules = {}   # <--- replace line with content on form_protection_rules.py
+	branch_prot_rules = {} 
 
 	try:
 		gitattr = get_blob_content(REST, USER, repo, ".git/info/attributes")
