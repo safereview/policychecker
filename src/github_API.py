@@ -7,18 +7,18 @@ import requests
 import re 
 
 
-# Get a list of branches
-def get_branches(g, user, repo):
-	repo_name = f"{user}/{repo}"
-	repo = g.get_repo(repo_name)	
-	return list(repo.get_branches())
+# GitHub REST API call
+REST = Github(TOKEN)
+
+# GitHub HEADERS
+HEADERS = {
+	'Authorization': f"token {TOKEN}",
+	"Accept" : "application/vnd.github.luke-cage-preview+json"
+	}
 
 
-# Get info about a branch
-def get_branch(g, user, repo, branch):
-	repo_name = f"{user}/{repo}"
-	return g.get_repo(repo_name).get_branch(branch)
-
+#---------------------------------------#
+# TODO: Make sure if we need to keep these functions
 
 # Get the head of a branch
 def get_branch_head(g, user, repo, branch):
@@ -27,9 +27,8 @@ def get_branch_head(g, user, repo, branch):
 	return branch.commit
 
 
-# Get Protection Status of that Branch
+# Get protection status of a branch
 def get_branch_protection_status(g, user, repo, branch):
-	# The Protection Status will either go to True or an Error, must debug for future 
 	repo_name = f"{user}/{repo}"
 	try:
 		branch = g.get_repo(repo_name).get_branch(branch)
@@ -42,11 +41,25 @@ def get_branch_protection_status(g, user, repo, branch):
 		SystemExit(e)
 
 	
-# See required status checks of branch
+# Get required status checks of a branch
 def get_required_branch_protection_checks(g, user, repo, branch):
 	repo_name = f"{user}/{repo}"
 	branch =  g.get_repo(repo_name).get_branch(branch)
 	return branch.get_protection()
+
+
+#---------------------------------------#
+# Functions that we need
+
+# Form a get request
+def get_request(endpoint):
+	return requests.get(f"{GITHUB_API}/{endpoint}", headers = HEADERS)
+
+
+# Get info about one branch
+def get_branch(g, user, repo, branch):
+	repo_name = f"{user}/{repo}"
+	return g.get_repo(repo_name).get_branch(branch)
 
 
 # Get file content
@@ -56,7 +69,7 @@ def get_blob_content(g, user, repo, path):
 
 
 # Create a status check
-def create_status_check(g, user, repo, sha, signature):
+def store_crp_signature(g, user, repo, sha, signature):
 	repo_name = "{}/{}".format(user, repo)
 	repo = g.get_repo(repo_name)
 	res = repo.get_commit(sha=sha).create_status(
@@ -68,7 +81,7 @@ def create_status_check(g, user, repo, sha, signature):
 	return res
 
 # grabs the latest status check 
-def grab_status_check_signature(g, user, repo, sha):
+def get_crp_signature(g, user, repo, sha):
 	repo_name = f"{user}/{repo}"
 	repo = g.get_repo(repo_name)
 	stati = repo.get_commit(sha=sha).get_statuses()
@@ -79,14 +92,16 @@ def grab_status_check_signature(g, user, repo, sha):
 		# print(f"{obj}\n\t{type(obj)}")
 
 
-def get_crp(g, user, repo, branch_name):
+# Form the code revivew policy
+def form_crp(g, user, repo, branch_name):
 
+	#Github CRP
 	gitattr = ""
 	codeowners = ""
-	branch_prot_rules = {} 
+	protection_rules = {}
 
 	try:
-		gitattr = get_blob_content(REST, USER, repo, ".git/info/attributes")
+		gitattributes = get_blob_content(REST, USER, repo, GITATTRIBUTES)
 	except Exception:
 		# print("error in gitattr")
 		pass
@@ -98,109 +113,93 @@ def get_crp(g, user, repo, branch_name):
 		pass
 
 	try:
-		branch_prot_rules = get_full_branch_protection(g, user, repo, branch_name)
+		protection_rules = get_branch_protection_rules(g, user, repo, branch_name)
 	except Exception:
 		# print("error in protections")
 		pass
 
-	crp = f"[{branch_prot_rules},{codeowners},{gitattr}]"
-	return crp.encode() # Needs to be in (bytes) in order to be put into the compute func
-
-# ==========================================================================================
-def get_full_branch_protection(g, user, repo, branch_name):
-    ret_dict = dict()    # ret_dict is just the return dictionary that will have the status of each branch
-    prot_resp = requests.get(f"https://api.github.com/repos/{user}/{repo}/branches/{branch_name}/protection", headers={'Authorization': f"token {TOKEN}", "Accept" : "application/vnd.github.luke-cage-preview+json" })
-    branch_resp = requests.get(f"https://api.github.com/repos/{user}/{repo}/branches/{branch_name}", headers={'Authorization': f"token {TOKEN}", "Accept" : "application/vnd.github.luke-cage-preview+json" })
-
-    pygithub_branch_object = get_branch(g, user, repo, branch_name) 
-
-    ret_dict['require_signed_commits'] = pygithub_branch_object.get_required_signatures()
-    ret_dict['include_administrators'] = pygithub_branch_object.get_admin_enforcement() 
+	#TODO:
+	#	- Strip all strings
+	# 	-DOC: The CRP format is as follows:
+	crp = f"[{protection_rules},{codeowners},{gitattr}]"
+	# Encode CRP
+	return crp.encode()
 
 
-    if(prot_resp.ok):
-        prot_load = json.loads(prot_resp.content)
-        ret_dict['require_linear_history'] = prot_load["required_linear_history"]['enabled']
-        ret_dict['allow_force_pushes'] = prot_load["allow_force_pushes"]['enabled']
-        ret_dict['allow_deletions'] = prot_load["allow_deletions"]['enabled']
+# Get branch protection rules
+def get_branch_protection_rules(g, user, repo, branch_name):
+	#FIXME: What if the user pass a Branch which is not protected
 
-        try:
-            resp_dump = json.dumps(prot_resp.json())
-            dismiss_stale = bool(re.search('"dismiss_stale_reviews": true', resp_dump)) 
-            require_codeowners = bool(re.search('"require_code_owner_reviews": true', resp_dump))
-            review_count = int(re.search('"required_approving_review_count": \d', resp_dump).group()[-1]) # gets the number count
-            ret_dict['require_pull_request_review'] = {}
-            ret_dict['require_pull_request_review']['enabled'] = True
-            ret_dict['require_pull_request_review']['approving_reviews_count'] = review_count
-            ret_dict['require_pull_request_review']['dismiss_stale_pull_request'] = dismiss_stale
-            ret_dict['require_pull_request_review']['require_review_from_code_owners'] = require_codeowners
-        except Exception:
-            ret_dict['require_pull_request_review'] = False
+	endpoint = f"{user}/{repo}/branches/{branch_name}/protection"
+	rules = get_request(endpoint)
 
+	#TODO: DOC
+	result = dict()
+	if(rules.ok):
+		rules_json = json.loads(rules.content)
+		result['require_linear_history'] = rules_json["required_linear_history"]['enabled']
+		result['allow_force_pushes'] = rules_json["allow_force_pushes"]['enabled']
+		result['allow_deletions'] = rules_json["allow_deletions"]['enabled']
 
-    if(branch_resp.ok):
-        branch_load = json.loads(branch_resp.content)
-        status_prot = branch_load["protection"]["required_status_checks"]["enforcement_level"]
-        if(status_prot == "off"):
-            ret_dict['require_status_checks'] = False
-        else:
-            branch = get_branch(g, user, repo, branch_name)
-            check_strict = bool(re.search("strict=True",str(branch.get_required_status_checks())))
-            ret_dict['require_status_checks'] = {}
-            ret_dict['require_status_checks']['enabled'] = True
-            ret_dict['require_status_checks']['strict'] = check_strict
-
-    return ret_dict
+		#TODO: We try the rules_dump becasue
+		try:
+			rules_dump = json.dumps(rules.json())
+			dismiss_stale = bool(re.search('"dismiss_stale_reviews": true', rules_dump))
+			require_codeowners = bool(re.search('"require_code_owner_reviews": true', rules_dump))
+			# get the minimum number of approvals: count
+			review_count = int(re.search('"required_approving_review_count": \d', rules_dump).group()[-1])
+			result['require_pull_request_review'] = {}
+			result['require_pull_request_review']['enabled'] = True
+			result['require_pull_request_review']['approving_reviews_count'] = review_count
+			result['require_pull_request_review']['dismiss_stale_pull_request'] = dismiss_stale
+			result['require_pull_request_review']['require_review_from_code_owners'] = require_codeowners
+		except Exception:
+			result['require_pull_request_review'] = False
 
 
-def project_full_branch_protections(g, user, repo):
-    full_prot_dict = {}
-    branches = g.get_repo(f"{user}/{repo}").get_branches()
-    for branch in branches:
-        full_prot_dict[branch.name] = {}
-        full_prot_dict[branch.name] = get_full_branch_protection(g, user, repo, branch.name)
+	#TODO: DOC
+	endpoint = f"{user}/{repo}/branches/{branch_name}"
+	branch_info = get_request(endpoint)
 
-    return full_prot_dict
-# ==========================================================================================
+	if(branch_info.ok):
+		branch_load = json.loads(branch_info.content)
+		status_prot = branch_load["protection"]["required_status_checks"]["enforcement_level"]
+		if(status_prot == "off"):
+			result['require_status_checks'] = False
+		else:
+			branch = get_branch(g, user, repo, branch_name)
+			check_strict = bool(re.search("strict=True",str(branch.get_required_status_checks())))
+			result['require_status_checks'] = {}
+			result['require_status_checks']['enabled'] = True
+			result['require_status_checks']['strict'] = check_strict
+
+	#TODO: Get other rules using a new API call, why?
+	# Get additional rules
+	branch_info = get_branch(g, user, repo, branch_name)
+	result['require_signed_commits'] = branch_info.get_required_signatures()
+	result['include_administrators'] = branch_info.get_admin_enforcement()
+
+	return result
 
 
 if __name__ == '__main__':
-	# GitHub REST API call
-	REST = Github(TOKEN)
+	# Get Branch Protection Rules
+	rules = get_branch_protection_rules(REST, USER, REPO, BRANCH)
+	print(rules)
 
-	branch_name = "dev"
+	# Form the CRP
+	crp = form_crp(REST, USER, REPO, BRANCH)
+	print(crp)
 
-	"""
-	# Try out some APIs
-	branches = get_branches (REST, USER, repo)
-	branch = get_branch (REST, USER, repo, "master")
-	branch_head = get_branch_head(REST, USER, repo, "master")
-	crp_sig = create_status_check(REST, USER, repo, 'HEAD', crp_signature)   # how you store the crp_signature
+	# Sign and Store the CRP
+	#FIXME: Fix the size issue
+	verify_key, crp_signature = compute_signature(crp)
+	result = store_crp_signature(REST, USER, REPO, 'HEAD', crp_signature[:140])
+	print(result)
 
-	# Print out results
-	print(f"{branch_head},\n\t {type(branch_head)}")
-	print(f"{branch},\n\t {type(branch)}")
-	print(f"{branches},\n\t {type(branches)}")
-	print(f"{crp_sig},\n\t {type(crp_sig)}")
-	# print("\n")
-	"""
-	# Get Branch Protections
-	branch_prot = get_full_branch_protection(REST, USER, repo,branch_name)
-	#print(branch_prot)
-	print(branch_prot)
+    # Retrieve and Verify CRP
+	retrieved_signature = get_crp_signature(REST, USER, REPO, 'HEAD')
+	result = verify_signature(retrieved_signature, verify_key)
+	print(result)
 
-	# Retrieve CRP, Sign It and Store  
-	crp = get_crp(REST, USER, repo, branch_name)
-	verify_key, crp_sign = compute_signature(crp)
-	stored = create_status_check(REST, USER, repo, 'HEAD', crp_sign[:140]) 
-
-    # Retrieve CRP signature, Verify it
-	retrieved_signature = grab_status_check_signature(REST, USER, repo, 'HEAD')
-	res = verify_signature(retrieved_signature, verify_key)
-	#print(res)
-
-	print(f"\nVerify:{verify_key}\n\ncrp_signature:{crp_sign}")
-	#print(f"\n{crp_sign[:140]}\n")
-	#print(retrieved_signature)
-	# print(get_full_branch_protection(REST, USER, repo, "dev"))
-	#print(get_branches(REST, USER, repo))
+	print(f"\nVerify:{verify_key}\n\ncrp_signature:{crp_signature}")
