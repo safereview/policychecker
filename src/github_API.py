@@ -2,7 +2,10 @@
 from github import Github
 from configs.github_config import *
 from crypto_manager import *
-from form_protection_rules import *
+import json
+import requests
+import re 
+
 
 # Get a list of branches
 def get_branches(g, user, repo):
@@ -103,6 +106,64 @@ def get_crp(g, user, repo, branch_name):
 	crp = f"[{branch_prot_rules},{codeowners},{gitattr}]"
 	return crp.encode() # Needs to be in (bytes) in order to be put into the compute func
 
+# ==========================================================================================
+def get_full_branch_protection(g, user, repo, branch_name):
+    ret_dict = dict()    # ret_dict is just the return dictionary that will have the status of each branch
+    prot_resp = requests.get(f"https://api.github.com/repos/{user}/{repo}/branches/{branch_name}/protection", headers={'Authorization': f"token {TOKEN}", "Accept" : "application/vnd.github.luke-cage-preview+json" })
+    branch_resp = requests.get(f"https://api.github.com/repos/{user}/{repo}/branches/{branch_name}", headers={'Authorization': f"token {TOKEN}", "Accept" : "application/vnd.github.luke-cage-preview+json" })
+
+    pygithub_branch_object = get_branch(g, user, repo, branch_name) 
+
+    ret_dict['require_signed_commits'] = pygithub_branch_object.get_required_signatures()
+    ret_dict['include_administrators'] = pygithub_branch_object.get_admin_enforcement() 
+
+
+    if(prot_resp.ok):
+        prot_load = json.loads(prot_resp.content)
+        ret_dict['require_linear_history'] = prot_load["required_linear_history"]['enabled']
+        ret_dict['allow_force_pushes'] = prot_load["allow_force_pushes"]['enabled']
+        ret_dict['allow_deletions'] = prot_load["allow_deletions"]['enabled']
+
+        try:
+            resp_dump = json.dumps(prot_resp.json())
+            dismiss_stale = bool(re.search('"dismiss_stale_reviews": true', resp_dump)) 
+            require_codeowners = bool(re.search('"require_code_owner_reviews": true', resp_dump))
+            review_count = int(re.search('"required_approving_review_count": \d', resp_dump).group()[-1]) # gets the number count
+            ret_dict['require_pull_request_review'] = {}
+            ret_dict['require_pull_request_review']['enabled'] = True
+            ret_dict['require_pull_request_review']['approving_reviews_count'] = review_count
+            ret_dict['require_pull_request_review']['dismiss_stale_pull_request'] = dismiss_stale
+            ret_dict['require_pull_request_review']['require_review_from_code_owners'] = require_codeowners
+        except Exception:
+            ret_dict['require_pull_request_review'] = False
+
+
+    if(branch_resp.ok):
+        branch_load = json.loads(branch_resp.content)
+        status_prot = branch_load["protection"]["required_status_checks"]["enforcement_level"]
+        if(status_prot == "off"):
+            ret_dict['require_status_checks'] = False
+        else:
+            branch = get_branch(g, user, repo, branch_name)
+            check_strict = bool(re.search("strict=True",str(branch.get_required_status_checks())))
+            ret_dict['require_status_checks'] = {}
+            ret_dict['require_status_checks']['enabled'] = True
+            ret_dict['require_status_checks']['strict'] = check_strict
+
+    return ret_dict
+
+
+def project_full_branch_protections(g, user, repo):
+    full_prot_dict = {}
+    branches = g.get_repo(f"{user}/{repo}").get_branches()
+    for branch in branches:
+        full_prot_dict[branch.name] = {}
+        full_prot_dict[branch.name] = get_full_branch_protection(g, user, repo, branch.name)
+
+    return full_prot_dict
+# ==========================================================================================
+
+
 if __name__ == '__main__':
 	# GitHub REST API call
 	REST = Github(TOKEN)
@@ -124,8 +185,9 @@ if __name__ == '__main__':
 	# print("\n")
 	"""
 	# Get Branch Protections
-	branch_prot = get_required_branch_protection_checks(REST, USER, repo,branch_name)
+	branch_prot = get_full_branch_protection(REST, USER, repo,branch_name)
 	#print(branch_prot)
+	print(branch_prot)
 
 	# Retrieve CRP, Sign It and Store  
 	crp = get_crp(REST, USER, repo, branch_name)
