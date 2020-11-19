@@ -1,11 +1,12 @@
 # Install: $ pip install PyGithub
 from github import Github
-from configs.github_config import *
-from crypto_manager import *
 import json
 import requests
 import re 
 
+from configs.github_config import *
+from crypto_manager import *
+from constants import *
 
 # GitHub REST API call
 REST = Github(TOKEN)
