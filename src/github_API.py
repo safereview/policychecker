@@ -8,15 +8,6 @@ from configs.github_config import *
 from crypto_manager import *
 from constants import *
 
-# GitHub REST API call
-REST = Github(TOKEN)
-
-# GitHub HEADERS
-HEADERS = {
-	'Authorization': f"token {TOKEN}",
-	"Accept" : "application/vnd.github.luke-cage-preview+json"
-	}
-
 
 #---------------------------------------#
 # TODO: Make sure if we need to keep these functions
@@ -69,7 +60,7 @@ def get_blob_content(g, user, repo, path):
 	return g.get_repo(repo_name).get_contents(path).decoded_content
 
 
-# Create a status check
+# Store the crp signature as review label on the server
 def store_crp_signature(g, user, repo, sha, signature):
 	repo_name = "{}/{}".format(user, repo)
 	repo = g.get_repo(repo_name)
@@ -81,7 +72,8 @@ def store_crp_signature(g, user, repo, sha, signature):
 	)
 	return res
 
-# grabs the latest status check 
+
+# Retrive the crp signature from the Gerrit server
 def get_crp_signature(g, user, repo, sha):
 	repo_name = f"{user}/{repo}"
 	repo = g.get_repo(repo_name)
@@ -123,7 +115,6 @@ def form_crp(g, user, repo, branch_name):
 	#	- Strip all strings
 	# 	-DOC: The CRP format is as follows:
 	crp = f"[{protection_rules},{codeowners},{gitattr}]"
-	# Encode CRP
 	return crp.encode()
 
 
@@ -184,6 +175,15 @@ def get_branch_protection_rules(g, user, repo, branch_name):
 
 
 if __name__ == '__main__':
+	# GitHub REST API call
+	REST = Github(TOKEN)
+
+	# GitHub HEADERS
+	HEADERS = {
+		'Authorization': f"token {TOKEN}",
+		"Accept" : "application/vnd.github.luke-cage-preview+json"
+		}
+
 	# Get Branch Protection Rules
 	rules = get_branch_protection_rules(REST, USER, REPO, BRANCH)
 	print(rules)
@@ -193,14 +193,11 @@ if __name__ == '__main__':
 	print(crp)
 
 	# Sign and Store the CRP
-	#FIXME: Fix the size issue
-	verify_key, crp_signature = compute_signature(crp)
-	result = store_crp_signature(REST, USER, REPO, 'HEAD', crp_signature[:140])
+	crp_signature = sign_crp(crp)
+	result = store_crp_signature(REST, USER, REPO, 'HEAD', crp_signature)
 	print(result)
 
-    # Retrieve and Verify CRP
+	# Retrieve and Verify CRP
 	retrieved_signature = get_crp_signature(REST, USER, REPO, 'HEAD')
-	result = verify_signature(retrieved_signature, verify_key)
+	result = verify_signature(crp, retrieved_signature, verify_key)
 	print(result)
-
-	print(f"\nVerify:{verify_key}\n\ncrp_signature:{crp_signature}")

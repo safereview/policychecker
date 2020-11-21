@@ -148,10 +148,11 @@ if __name__ == '__main__':
     print(crp)
 
 	# Sign and Store the CRP
-    verify_key, crp_signature = compute_signature(crp)
-    res = store_crp_signature(project, crp_signature)
+    crp_signature = sign_crp(crp)
+    result = store_crp_signature(project, crp_signature)
+    print(result)
 
     # Retrieve and Verify CRP
     retrieved_signature = get_crp_signature(project)
-    res = verify_signature(retrieved_signature, verify_key)
-    print(res)
+    result = verify_signature(crp, retrieved_signature, verify_key)
+    print(result)
