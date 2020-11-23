@@ -45,4 +45,4 @@ def verify_signature(msg, signature, verify_key):
 def sign_crp(crp):
     signing_key, verify_key = generate_key()
     signed_hex = compute_signature(crp, signing_key)
-    return signed_hex.signature.decode("utf-8")
+    return signed_hex.signature.decode("utf-8"), verify_key

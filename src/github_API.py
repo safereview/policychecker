@@ -193,7 +193,7 @@ if __name__ == '__main__':
 	print(crp)
 
 	# Sign and Store the CRP
-	crp_signature = sign_crp(crp)
+	crp_signature, verify_key = sign_crp(crp)
 	result = store_crp_signature(REST, USER, REPO, 'HEAD', crp_signature)
 	print(result)
 
