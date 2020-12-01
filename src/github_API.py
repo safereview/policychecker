@@ -8,41 +8,6 @@ from configs.github_config import *
 from crypto_manager import *
 from constants import *
 
-
-#---------------------------------------#
-# TODO: Make sure if we need to keep these functions
-
-# Get the head of a branch
-def get_branch_head(g, user, repo, branch):
-	repo_name = f"{user}/{repo}"
-	branch = g.get_repo(repo_name).get_branch(branch)
-	return branch.commit
-
-
-# Get protection status of a branch
-def get_branch_protection_status(g, user, repo, branch):
-	repo_name = f"{user}/{repo}"
-	try:
-		branch = g.get_repo(repo_name).get_branch(branch)
-		branch_prot = branch.protected
-		if( isinstance(branch_prot, bool) ):
-			return True
-		else:
-			return False  
-	except Exception as e:
-		SystemExit(e)
-
-	
-# Get required status checks of a branch
-def get_required_branch_protection_checks(g, user, repo, branch):
-	repo_name = f"{user}/{repo}"
-	branch =  g.get_repo(repo_name).get_branch(branch)
-	return branch.get_protection()
-
-
-#---------------------------------------#
-# Functions that we need
-
 # Form a get request
 def get_request(endpoint):
 	return requests.get(f"{GITHUB_API}/{endpoint}", headers = HEADERS)
