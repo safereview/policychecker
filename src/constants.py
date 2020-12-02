@@ -3,6 +3,8 @@ CODEOWNERS = ".github/CODEOWNERS"
 GITATTRIBUTES = ".git/info/attributes"
 GITHUB_API = "https://api.github.com/repos"
 GITHUB = 'github'
+SHA = 'HEAD'
+HEAD_ACCEPT = "https://developer.github.com/changes/2018-02-22-protected-branches-required-signatures/"
 
 # Gerrit
 CONFIG_BRANCH = 'refs/meta/config'
