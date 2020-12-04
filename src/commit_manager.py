@@ -3,6 +3,8 @@ from git import Repo
 import re
 from configs.gerrit_config import *
 from constants import *
+from gerrit_API import list_groups, get_group_info
+from gerrit_API import get_branch_head, get_blob_content
 
 
 def has_multiple_parents(commit):
@@ -10,11 +12,43 @@ def has_multiple_parents(commit):
 
 
 def has_direct_push_permission(committer, permissions):
-    # TODO: Check the user permission using two files:
-    #   - CONFIG_PROJECT
-    #   - CONFIG_GROUP
+    # Get the project config with an API call
+    # This code is for testing purposes only
+    ap_head = get_branch_head(ALL_PROJECTS, CONFIG_BRANCH)
+    project_config = get_blob_content(ALL_PROJECTS, ap_head, CONFIG_PROJECT)
+    # # #
 
-    return True
+    committers_groups = find_group_membership(committer)
+
+    # Extract the 'refs/heads/*' access rights which contains
+    # the groups that are allowed to direct push onto ALL branches
+    access_rights = re.findall("\[access \"refs/heads/\*\"\]"
+        "[\s\S]+?(?=\[)", project_config)[0]
+
+    # Check each group to see if one has the direct push permission
+    for g in committers_groups:
+        if f"push = group {g}" in access_rights:
+            return True
+
+    return False
+
+
+# Find the groups that a committer is in
+def find_group_membership(committer):
+    # Get all of the groups in the Gerrit project
+    groups = list_groups()
+    committers_groups = []
+
+    for g in groups:
+        g_id = groups[g]['group_id']
+        for member in get_group_info(g_id)['members']:
+            if (
+                member['name'] == committer.name
+                and member['email'] == committer.email
+            ):
+                committers_groups.append(g)
+    
+    return committers_groups
 
 
 # Check if the commit has the first review unit in a chain
