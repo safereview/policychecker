@@ -31,11 +31,11 @@ def verify_signature(msg, signature, verify_key):
     # Decode signature to byte
     signature_bytes = HexEncoder.decode(signature)
 
-    result = 'Valid Signature!'
+    result = True
     try:
         verify_key.verify(msg_hex, signature_bytes, encoder=HexEncoder)
     except BadSignatureError:
-        result = 'Invalid Signature!'
+        result = False
         pass
 
     return result
