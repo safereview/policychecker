@@ -1,7 +1,14 @@
+
+# $ pip install PyGithub
+from github import Github
+
 import json
 import requests
 import re
-from bs4 import BeautifulSoup as bs
+
+# from bs4 import BeautifulSoup as bs
+# CODE EXPLAIN: 
+# BeautifulSoup is used to potentially grab the preview from the future changes in preview automatically 
 
 from configs.github_config import *
 from crypto_manager import *
@@ -9,8 +16,8 @@ from constants import *
 
 # NOTE: Headers accept content change
 # For latest: https://developer.github.com/changes/2018-02-22-protected-branches-required-signatures/
-ACCEPT = bs(requests.get(HEAD_ACCEPT).text, 'html.parser').find('code').get_text()
-# This will parse the blog that it gets it from the latest preview
+# ACCEPT = bs(requests.get(HEAD_ACCEPT).text, 'html.parser').find('code').get_text()
+# Potentially, This will parse the blog that it gets it from the latest preview.
 
 
 HEADERS = {
@@ -21,19 +28,19 @@ HEADERS = {
 POST_HEADERS = {
 	'Authorization': f"token {TOKEN}",
 	"Accept" : "application/vnd.github.v3+json"
-}
+} # The documentation suggested to use the following accept for POST request
 
-new_HEADER = {
-	'Authorization' : f"token {TOKEN}",
-	"Accept" : f"{ACCEPT}"
-}
+# new_HEADER = {
+# 	'Authorization' : f"token {TOKEN}",
+# 	"Accept" : f"{ACCEPT}"
+# }
 
-hyper_flex = lambda endpoint, header: requests.get(f"{GITHUB_API}/{endpoint}", headers=header)
+# hyper_flex = lambda endpoint, header: requests.get(f"{GITHUB_API}/{endpoint}", headers=header)
 
 # Form a get request
 def get_request(endpoint):
 	try:
-		return requests.get(f"{GITHUB_API}/{endpoint}", headers = new_HEADER)
+		return requests.get(f"{GITHUB_API}/{endpoint}", headers = HEADERS)
 	except Exception:
 		pass
 
@@ -46,8 +53,10 @@ def get_blob_content(user, repo, path):
 	return requests.get(kson["download_url"]).content   #--> does the same exact thing as the former get_blob_content
 	# Note: that ^it doesn't take in directories very well
 
-######
+###### Invalid and trial code
 def store_new_crp_signature(user, repo, signature):
+	return 0
+	# The followings is potent code that can be used to complete minimizes the usage of PyGithub
     # :calls: `POST /repos/:owner/:repo/statuses/:sha <http://developer.github.com/v3/repos/statuses>`_
 	endpoint = f"{user}/{repo}/statuses/{SHA}"
 	url = f"{GITHUB_API}/{endpoint}"
@@ -65,11 +74,10 @@ def store_new_crp_signature(user, repo, signature):
 	#print(yeet)
 	#return requests.Request(method="POST", url=url, data=json.dumps(payload), headers=HEADERS) #yeet
 
-
-
 # Store the crp signature as review label on the server
-def store_crp_signature(g, user, repo, sha, signature):
+def store_crp_signature(user, repo, sha, signature):
     # :calls: `POST /repos/:owner/:repo/statuses/:sha <http://developer.github.com/v3/repos/statuses>`_
+	g = Github(TOKEN)
 	repo_name = f"{user}/{repo}"
 	repo = g.get_repo(repo_name)
 	res = repo.get_commit(sha=sha).create_status(
@@ -175,11 +183,12 @@ def get_branch_protection_rules(user, repo, branch_name):
 		return False
 
 if __name__ == '__main__':
-	kol = store_new_crp_signature(USER, REPO, "asfaskdfjkasdfaksdfkshdfad")
-	print(kol)
+	pass
+	# kol = store_crp_signature(USER, REPO, 'HEAD', "asfaskdfjkasdfaksdfkshdfad")
+	# print(kol)
 
-	btu = get_crp_signature(USER, REPO)
-	print(btu)
+	# btu = get_crp_signature(USER, REPO)
+	# print(btu)
 
 	# # Get Branch Protection Rules
 	# rules = get_branch_protection_rules(USER, REPO, BRANCH)
