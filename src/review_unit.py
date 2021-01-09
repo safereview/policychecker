@@ -4,6 +4,13 @@
 # https://github.com/secure-systems-lab/securesystemslib/blob/master/securesystemslib/gpg/__init__.py
 
 
+def gpg_verify_data(sig_filename, message):
+    from gnupg import GPG
+    GPGHOME = '/home/fernando/.gnupg'
+    gpg = GPG(gnupghome=GPGHOME)
+    return gpg.verify_data(sig_filename, message)
+
+
 def gpg_sign(message):
     from gnupg import GPG
     # TODO: Make it work for any condition in particular
@@ -11,7 +18,7 @@ def gpg_sign(message):
     GPGHOME = '/home/hmd/.gnupg'
     #'C:\\Users\\hye\\.gnupg'
     gpg = GPG(gnupghome=GPGHOME)
-    return gpg.sign(message)
+    return gpg.sign(message, detach=True)
 
 
 class Review:
@@ -45,7 +52,7 @@ class ReviewUnit:
         '''
         signature = self._sign_review_unit()
         return f"{self.review}\
-            \n{self.reviewer.name}\ <{self.reviewer.email}>\
+            \n{self.reviewer.name} <{self.reviewer.email}>\
             \n{signature}"
 
 
@@ -59,7 +66,7 @@ class ReviewUnit:
         The first review unit has no previous signature.
         '''
         payload = f"{self.review}\
-            \n{self.reviewer.name}\ <{self.reviewer.email}"
+            \n{self.reviewer.name} <{self.reviewer.email}>"
 
         # Add previous review unit's signature if there is any
         if self.previous_signature:

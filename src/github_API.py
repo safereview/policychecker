@@ -44,8 +44,8 @@ def get_required_branch_protection_checks(g, user, repo, branch):
 # Functions that we need
 
 # Form a get request
-def get_request(endpoint):
-	return requests.get(f"{GITHUB_API}/{endpoint}", headers = HEADERS)
+def get_request(endpoint, headers):
+	return requests.get(f"{GITHUB_API}/{endpoint}", headers = headers)
 
 
 # Get info about one branch
@@ -86,7 +86,7 @@ def get_crp_signature(g, user, repo, sha):
 
 
 # Form the code revivew policy
-def form_crp(g, user, repo, branch_name):
+def form_github_crp(g, user, repo, branch_name):
 
 	#Github CRP
 	gitattr = ""
@@ -119,11 +119,11 @@ def form_crp(g, user, repo, branch_name):
 
 
 # Get branch protection rules
-def get_branch_protection_rules(g, user, repo, branch_name):
+def get_branch_protection_rules(g, headers, user, repo, branch_name):
 	#FIXME: What if the user pass a Branch which is not protected
 
 	endpoint = f"{user}/{repo}/branches/{branch_name}/protection"
-	rules = get_request(endpoint)
+	rules = get_request(endpoint, headers)
 
 	#TODO: DOC
 	result = dict()
@@ -151,7 +151,7 @@ def get_branch_protection_rules(g, user, repo, branch_name):
 
 	#TODO: DOC
 	endpoint = f"{user}/{repo}/branches/{branch_name}"
-	branch_info = get_request(endpoint)
+	branch_info = get_request(endpoint, headers)
 
 	if(branch_info.ok):
 		branch_load = json.loads(branch_info.content)
@@ -172,32 +172,3 @@ def get_branch_protection_rules(g, user, repo, branch_name):
 	result['include_administrators'] = branch_info.get_admin_enforcement()
 
 	return result
-
-
-if __name__ == '__main__':
-	# GitHub REST API call
-	REST = Github(TOKEN)
-
-	# GitHub HEADERS
-	HEADERS = {
-		'Authorization': f"token {TOKEN}",
-		"Accept" : "application/vnd.github.luke-cage-preview+json"
-		}
-
-	# Get Branch Protection Rules
-	rules = get_branch_protection_rules(REST, USER, REPO, BRANCH)
-	print(rules)
-
-	# Form the CRP
-	crp = form_crp(REST, USER, REPO, BRANCH)
-	print(crp)
-
-	# Sign and Store the CRP
-	crp_signature, verify_key = sign_crp(crp)
-	result = store_crp_signature(REST, USER, REPO, 'HEAD', crp_signature)
-	print(result)
-
-	# Retrieve and Verify CRP
-	retrieved_signature = get_crp_signature(REST, USER, REPO, 'HEAD')
-	result = verify_signature(crp, retrieved_signature, verify_key)
-	print(result)
