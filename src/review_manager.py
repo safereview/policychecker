@@ -2,23 +2,7 @@
 # TODO: Make a requirements.txt file to add python-gnupg
 # Consider the following note as well:
 # https://github.com/secure-systems-lab/securesystemslib/blob/master/securesystemslib/gpg/__init__.py
-
-
-def gpg_verify_data(sig_filename, message):
-    from gnupg import GPG
-    GPGHOME = '/home/fernando/.gnupg'
-    gpg = GPG(gnupghome=GPGHOME)
-    return gpg.verify_data(sig_filename, message)
-
-
-def gpg_sign(message):
-    from gnupg import GPG
-    # TODO: Make it work for any condition in particular
-    # when there is no existing keys at ~/.gnupg/
-    GPGHOME = '/home/hmd/.gnupg'
-    #'C:\\Users\\hye\\.gnupg'
-    gpg = GPG(gnupghome=GPGHOME)
-    return gpg.sign(message, detach=True)
+from crypto_manager import gpg_sign_message
 
 
 class Review:
@@ -73,12 +57,43 @@ class ReviewUnit:
             payload = f"{self.previous_signature}\
                 \n{payload}"
 
-        return gpg_sign(payload)
+        return gpg_sign_message(payload)
 
 
-if __name__ == '__main__':
-    # Create a simple signed review unit
-    review = Review("+1")
-    reviewer = Reviewer('Nick Simon', 'nick@example.com')
-    ru = ReviewUnit(review.review, reviewer)
-    print(ru.review_unit)
+# Check if the commit has the first review unit in a chain
+def is_first_review(review_units):
+    for unit in review_units:
+        # Split the unit into the review and signature
+        # portions to attempt verification
+        signature = PGP_START + unit.split(PGP_START)[1]
+        review = unit.split(signature)\
+            [0].strip().encode()
+
+        # Create a temporary file containing the
+        # review unit's signature as required by Py-GNUPG
+        with NamedTemporaryFile('w+') as sig_file:
+            sig_file.write(signature)
+            sig_file.flush()
+
+            # If the review is successfully verified by the
+            # attached signature, the signature was computed
+            # over this review only, proving it is the first
+            # in the chain
+            is_verified = gpg_verify_signature(
+                sig_file.name, review)
+            if is_verified:
+                return True
+
+    return False
+
+
+# Check if the review unit's signature is valid
+def validate_reviews_signatures(review_units):
+    #TODO
+    return True
+
+
+# Check if the chain of reviews is valid
+def validate_review_chain(review_units):
+    #TODO
+    return True

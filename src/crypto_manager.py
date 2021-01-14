@@ -1,8 +1,11 @@
 #TODO:Check integrity before verification
 
+from gnupg import GPG
 from nacl.encoding import HexEncoder
 from nacl.signing import SigningKey, VerifyKey
 from nacl.exceptions import BadSignatureError
+
+from constants import GPGHOME
 
 
 # Generate a pair of key
@@ -41,8 +44,20 @@ def verify_signature(msg, signature, verify_key):
     return result
 
 
-# Compute an ed25519 over the CRP 
-def sign_crp(crp):
+# Compute an ed25519 signature over the CRP
+def ed25519_sign_message(crp):
     signing_key, verify_key = generate_key()
     signed_hex = compute_signature(crp, signing_key)
     return signed_hex.signature.decode("utf-8"), verify_key
+
+
+# Sign a message using the gpg signature
+def gpg_sign_message(message):
+    gpg = GPG(gnupghome=GPGHOME)
+    return gpg.sign(message, detach=True)
+
+
+# Verify a gpg signature
+def gpg_verify_signature(signature_file, message):
+    gpg = GPG(gnupghome=GPGHOME)
+    return gpg.verify_data(signature_file, message)

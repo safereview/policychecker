@@ -1,16 +1,14 @@
-# Install: $ pip install PyGithub
+#TODO:Add prerequisites
+# 	- pip install PyGithub
 from github import Github
 import json
 import requests
 import re 
 
 from configs.github_config import *
-from crypto_manager import *
 from constants import *
+from crypto_manager import *
 
-
-#---------------------------------------#
-# TODO: Make sure if we need to keep these functions
 
 # Get the head of a branch
 def get_branch_head(g, user, repo, branch):
@@ -85,39 +83,6 @@ def get_crp_signature(g, user, repo, sha):
 		# print(f"{obj}\n\t{type(obj)}")
 
 
-# Form the code revivew policy
-def form_github_crp(g, user, repo, branch_name):
-
-	#Github CRP
-	gitattr = ""
-	codeowners = ""
-	protection_rules = {}
-
-	try:
-		gitattributes = get_blob_content(REST, USER, repo, GITATTRIBUTES)
-	except Exception:
-		# print("error in gitattr")
-		pass
-
-	try:
-		codeowners = get_blob_content(g, user, repo, CODEOWNERS)
-	except Exception:
-		# print("error in codeowners")
-		pass
-
-	try:
-		protection_rules = get_branch_protection_rules(g, user, repo, branch_name)
-	except Exception:
-		# print("error in protections")
-		pass
-
-	#TODO:
-	#	- Strip all strings
-	# 	-DOC: The CRP format is as follows:
-	crp = f"[{protection_rules},{codeowners},{gitattr}]"
-	return crp.encode()
-
-
 # Get branch protection rules
 def get_branch_protection_rules(g, headers, user, repo, branch_name):
 	#FIXME: What if the user pass a Branch which is not protected
@@ -172,3 +137,65 @@ def get_branch_protection_rules(g, headers, user, repo, branch_name):
 	result['include_administrators'] = branch_info.get_admin_enforcement()
 
 	return result
+
+
+	# Form the code revivew policy
+def form_github_crp(g, user, repo, branch_name):
+
+	#Github CRP
+	gitattr = ""
+	codeowners = ""
+	protection_rules = {}
+
+	try:
+		gitattributes = get_blob_content(REST, USER, repo, GITATTRIBUTES)
+	except Exception:
+		# print("error in gitattr")
+		pass
+
+	try:
+		codeowners = get_blob_content(g, user, repo, CODEOWNERS)
+	except Exception:
+		# print("error in codeowners")
+		pass
+
+	try:
+		protection_rules = get_branch_protection_rules(g, user, repo, branch_name)
+	except Exception:
+		# print("error in protections")
+		pass
+
+	#TODO:
+	#	- Strip all strings
+	# 	-DOC: The CRP format is as follows:
+	crp = f"[{protection_rules},{codeowners},{gitattr}]"
+	return crp.encode()
+
+
+# Validate the GitHub repo's code review policy
+def validate_github_crp(repo, branch):
+	# GitHub REST API call
+	REST = Github(TOKEN)
+
+	# GitHub HEADERS
+	HEADERS = {
+		'Authorization': f"token {TOKEN}",
+		"Accept" : "application/vnd.github.luke-cage-preview+json"
+		}
+
+	# Get Branch Protection Rules
+	rules = get_branch_protection_rules(REST, HEADERS, USER, repo, branch)
+	print(rules)
+
+	# Form the CRP
+	crp = form_github_crp(REST, USER, repo, branch)
+	print(crp)
+
+	# Sign and Store the CRP
+	crp_signature, verify_key = ed25519_sign_message(crp)
+	result = store_crp_signature(REST, USER, repo, 'HEAD', crp_signature)
+	print(result)
+
+	# Retrieve and Verify CRP
+	retrieved_signature = get_crp_signature(REST, USER, repo, 'HEAD')
+	return crp, verify_signature(crp, retrieved_signature, verify_key)

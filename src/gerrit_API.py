@@ -1,15 +1,13 @@
-#TODO: Add requirements to
-#   - Support f strings 
-#   - Add prerequisites
-#       - pip install pygerrit2
-#       - pip install PyNaCl
+#TODO:Add prerequisites
+#   - pip install pygerrit2
+#   - pip install PyNaCl
 
 from pygerrit2 import GerritRestAPI, HTTPBasicAuth
 
-from crypto_manager import *
 from configs.gerrit_config import *
-from utils import file_path_trim
 from constants import *
+from crypto_manager import *
+from utils import file_path_trim
 
 
 # create the REST API call
@@ -124,7 +122,7 @@ def form_gerrit_crp(g, project):
     project_config = ''
     groups = ''
     try:
-        # rules.pl is not created by default. It is 
+        # rules.pl is not created by default. It is
         # available only if there is a customized rule.
         rules_pl = get_blob_content(g, ALL_PROJECTS, ap_head, CONFIG_RULES)
         groups = get_blob_content(g, ALL_PROJECTS, ap_head, CONFIG_GROUP)
@@ -137,3 +135,22 @@ def form_gerrit_crp(g, project):
 	# 	-DOC: The CRP format is as follows:
     crp = f"{rules_pl}{project_config}{groups}"
     return crp.encode()
+
+
+# Validate the GitHub repo's code review policy
+def validate_gerrit_crp(repo, branch):
+	# Gerrit REST API call
+	REST = get_rest_api(USER, PASS, url)
+
+	# Form the CRP
+	crp = form_gerrit_crp(REST, repo)
+	print(crp)
+
+	# Sign and Store the CRP
+	crp_signature, verify_key = ed25519_sign_message(crp)
+	result = store_crp_signature(REST, repo, crp_signature)
+	print(result)
+
+	# Retrieve and Verify CRP
+	retrieved_signature = get_crp_signature(repo)
+	return crp, verify_signature(crp, retrieved_signature, verify_key)

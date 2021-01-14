@@ -1,24 +1,56 @@
 # Install: $ pip install gitpython
 from git import Repo
 import re
+from tempfile import NamedTemporaryFile
+
 from configs.gerrit_config import *
 from constants import *
-from gerrit_API import list_groups, get_group_info
-from gerrit_API import get_branch_head, get_blob_content
-from tempfile import NamedTemporaryFile
-from review_unit import gpg_verify_data
+from crypto_manager import gpg_verify_signature
+from gerrit_API import *
+from review_manager import is_first_review
 
 
+# List all commits in a branch
+def get_branch_commits(repo, branch):
+    #TODO:
+    return set([])
+
+
+# Get the head of a branch
+def get_branch_head(repo, branch):
+    #TODO:
+    return 0
+
+
+# Remove visited commits
+def remove_visited_commit(commits, merge_commits):
+    for commit in merge_commits:
+        commits.remove(commit)
+
+
+# Get the head of a set of commits
+def get_current_head(commits):
+    # Assume the first commit in the list is head
+    # TODO: Make sure it works
+    return list(commits)[0]
+
+
+# Check if the commits' signature is valid
+def validate_commit_signature(commit):
+    return True
+
+
+# Check if he commit has multiple parents
 def has_multiple_parents(commit):
     return len(commit.parents) > 1
 
 
+# Check if the committer has the push permission
 def has_direct_push_permission(committer, permissions):
     # Get the project config with an API call
     # This code is for testing purposes only
     ap_head = get_branch_head(ALL_PROJECTS, CONFIG_BRANCH)
     project_config = get_blob_content(ALL_PROJECTS, ap_head, CONFIG_PROJECT)
-    # # #
 
     committers_groups = find_group_membership(committer)
 
@@ -51,33 +83,6 @@ def find_group_membership(committer):
                 committers_groups.append(g)
     
     return committers_groups
-
-
-# Check if the commit has the first review unit in a chain
-def is_first_review(review_units):
-    for unit in review_units:
-        # Split the unit into the review and signature
-        # portions to attempt verification
-        signature = PGP_START + unit.split(PGP_START)[1]
-        review = unit.split(signature)\
-            [0].strip().encode()
-
-        # Create a temporary file containing the 
-        # review unit's signature as required by Py-GNUPG
-        with NamedTemporaryFile('w+') as sig_file:
-            sig_file.write(signature)
-            sig_file.flush()
-
-            # If the review is successfully verified by the
-            # attached signature, the signature was computed
-            # over this review only, proving it is the first 
-            # in the chain
-            is_verified = gpg_verify_data(
-                sig_file.name, review)
-            if is_verified:
-                return True
-
-    return False
 
 
 # Extrcact all review units in a commit
@@ -232,3 +237,11 @@ def gerrit_extract_merge_request_commits(repo, commit):
         merge_commits,
         review_units
     }
+
+
+# Extract the merge requests' commits
+def extract_review_units(server, repo, commit):
+if server == GITHUB:
+    return github_extract_merge_request_commits (repo, commit)
+else:
+    return gerrit_extract_merge_request_commits (repo, commit)
