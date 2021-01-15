@@ -33,137 +33,21 @@
 # TODO: Check code reviews against review policies
 
 import argparse
-from sys import exit
 import re
+from sys import exit
 
 from code_review_policy import *
 from commit_manager import *
+from constants import *
+from crp_manager import *
+from github_API import *
+from gerrit_API import *
+from review_manager import *
 
 
-GERRIT_LABELS = {
-    #ANY_WITH_BLOCK
-    "ANYWITHBLOCK": {
-        "isBlock": True,
-        "isRequired": False,
-        "requiresMaxValue": False
-    },
-    #MAX_NO_BLOCK
-    "MAXNOBLOCK": {
-        "isBlock": False,
-        "isRequired": True,
-        "requiresMaxValue": True
-    },
-    #MAX_WITH_BLOCK
-    "MAXWITHBLOCK": {
-        "isBlock": True,
-        "isRequired": True,
-        "requiresMaxValue": True
-    },
-    #NO_BLOCK
-    "NOBLOCK": {
-    },
-    "NoOp": {
-    },
-    "PatchSetLock": {
-    }
-}
-
-
-def remove_visited_commit(commits, merge_commits):
-    for commit in merge_commits:
-        commits.remove(commit)
-
-
-def get_branch_commits(repo, branch):
-    #TODO:
-    return set([])
-
-
-def get_branch_head(repo, branch):
-    #TODO:
-    return 0
-
-def get_current_head(commits):
-    # Assume the first commit in the list is head
-    # TODO: Make sure it works
-    return list(commits)[0]
-
-
-def validate_commit_signature(commit):
+# Check if the reviews created on GitHub are legitimate
+def github_validate_reviews(merge_commits, review_units):
     return True
-
-
-def validate_reviews_signatures(review_units):
-    return True
-
-
-def validate_review_chain(review_units):
-    return True
-
-
-def is_authorized_merger(commits, crp):
-    return True
-
-
-def is_authorized_committer(commits, crp):
-    return True
-
-
-def check_min_approvals(crp, review_units):
-    return True
-
-
-def check_required_reviews(crp, review_units):
-    return True
-
-
-def check_review_dismissal(crp, review_units):
-    return True
-
-
-def find_max_positive(project_config):
-    #TODO
-    return 2
-
-
-def find_max_negative(project_config):
-    #TODO
-    return -2
-
-
-def is_max_positive (project_config, score):
-    return True if score == find_max_positive(project_config) else False
-
-
-def is_max_negative (project_config, score):
-    return True if score == find_max_negative(project_config) else False
-
-
-def is_allowed_to_block(committer):
-    #TODO: check if committer allows to block
-    return True
-
-
-def is_allowed_to_approve(committer):
-    #TODO: check if committer allows to block
-    return True
-
-
-def parse_crp(crp):
-    #TODO: extarct three parts of the crp
-    PCONFIG = r"\[label \"Code-Review\"\]\n\
-	function = MaxWithBlock\n\
-	defaultValue = 0\n"
-    return PCONFIG
-
-
-def extract_gerrit_labels(crp):
-    #TODO: Extract config file from crp
-    project_config = parse_crp(crp)
-
-    # Extract the default policy from the pro
-    default_policy = re.search("function.*\n", project_config).group()
-    return default_policy.split("=")[1].strip()
 
 
 def check_gerrit_labels(crp, review_units):
@@ -172,7 +56,7 @@ def check_gerrit_labels(crp, review_units):
     # https://github.com/GerritCodeReview/gerrit/blob/master/java/com/google/gerrit/entities/LabelFunction.java#L91-#L123
 
     #extract the default policy
-    label = extract_gerrit_labels(crp)
+    label = gerrit_extract_labels(crp)
     rule = GERRIT_LABELS[label.upper()]
 
     #TODO: Extract config file from crp
@@ -189,14 +73,14 @@ def check_gerrit_labels(crp, review_units):
             continue
 
         if rule["isBlock"] and is_max_negative(project_config, score):
-            if not is_allowed_to_block(reviewer):
-                exit("Committer is not allowed to block")
+            if not is_allowed_to_block(crp, reviewer):
+                exit("Committer is not allowed to block the change")
             status = "REJECT"
             return status
 
-        if is_max_positive(project_config, score) or not rule["isBlock"]:
-            if not is_allowed_to_block(reviewer):
-                exit("Committer is not allowed to block")
+        if is_max_positive(project_config, score) or not rule["requiresMaxValue"]:
+            if not is_allowed_to_approve(crp, reviewer):
+                exit("Committer is not allowed to approve the change")
             status = "MAY"
 
             if rule["isRequired"]:
@@ -208,8 +92,8 @@ def check_gerrit_labels(crp, review_units):
     return status
 
 
-def validate_gerrit_reviews(crp, review_units):
-
+# Check if the reviews created on GitHub are legitimate
+def gerrit_validate_reviews(crp, review_units):
     # Check if the basic rules (based on labels) are met
     if not check_gerrit_labels(crp, review_units):
         return False
@@ -229,11 +113,8 @@ def validate_gerrit_reviews(crp, review_units):
     return True
 
 
-def validate_github_reviews(merge_commits, review_units):
-    return True
-
-
-def validate_review_units(server, crp, merge_commit_type, merge_commits, review_units):
+# Check if the review units are legitimate
+def validate_reviews(server, crp, merge_commit_type, merge_commits, review_units):
     # Check if review units have valid signature
     if not validate_reviews_signatures(review_units):
         return False
@@ -249,27 +130,21 @@ def validate_review_units(server, crp, merge_commit_type, merge_commits, review_
         return check_direct_push(merge_commits)
 
     # Check if the merger has the permission
-    if not is_authorized_merger(merge_commits, crp):
+    if not is_authorized_merger(crp, merge_commits):
         return False
 
     #Check if the author of code was authorized
-    if not is_authorized_committer(merge_commits, crp):
+    if not is_authorized_committer(crp, merge_commits):
         return False
 
     # Check if policy rules are violated
     if server == GITHUB:
-        return validate_github_reviews(merge_commits, review_units)
+        return github_validate_reviews(merge_commits, review_units)
     else:
-        return validate_gerrit_reviews(merge_commits, review_units)
+        return gerrit_validate_reviews(merge_commits, review_units)
 
 
-def extract_review_units(server, repo, commit):
-    if server == GITHUB:
-        return github_extract_merge_request_commits (repo, commit)
-    else:
-        return gerrit_extract_merge_request_commits (repo, commit)
-
-
+# Validate all reviews in a branch
 def validate_branch(server, repo, branch):
     valid = True
     if server == GITHUB:
@@ -301,7 +176,7 @@ def validate_branch(server, repo, branch):
     # corresponds to the current branch head
     while commits:
         merge_commit_type, merge_commits, review_units = extract_review_units(server, repo, branch_head)
-        if not validate_review_units(server, crp, merge_commit_type, merge_commits, review_units):
+        if not validate_reviews(server, crp, merge_commit_type, merge_commits, review_units):
             # TODO: Make it more informative per result
             exit('Review Units are not valid')
 
@@ -314,6 +189,8 @@ def validate_branch(server, repo, branch):
 
     return True
 
+
+# Parse the artuments
 def create_parser():
     '''
     Create and return configured ArgumentParser instance.
@@ -341,6 +218,7 @@ def create_parser():
     return parser
 
 
+# Main function
 def main():
     '''
     Parse arguments, load key(s) from disk (if passedd)
