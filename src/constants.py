@@ -19,7 +19,7 @@ MERGE = 'Merge'
 REBASE = 'Rebase'
 SQUASH = 'SquashAndMerge'
 PGP_SIG = 'gpgsig'
-GP_START = '-----BEGIN PGP SIGNATURE-----'
+PGP_START = '-----BEGIN PGP SIGNATURE-----'
 PGP_END = '-----END PGP SIGNATURE-----'
 
 # TODO: Make it work for any condition in particular
