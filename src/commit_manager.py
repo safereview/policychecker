@@ -12,14 +12,24 @@ from review_manager import is_first_review
 
 # List all commits in a branch
 def get_branch_commits(repo, branch):
-    #TODO:
-    return set([])
+    branch_commits = []
+    commit_ids = repo.git.rev_list(
+        branch).split()
+    for id in commit_ids:
+        branch_commits.append(repo.commit(id))
+
+    # Returns a list of all branch commits
+    # in order from newest to oldest
+    return branch_commits
 
 
 # Get the head of a branch
 def get_branch_head(repo, branch):
-    #TODO:
-    return 0
+    # The branch head can be obtained by
+    # getting the first commit in the branch_commits
+    # list, so this might not be needed?
+    head_id = repo.git.rev_parse(branch)
+    return repo.commit(head_id)
 
 
 # Remove visited commits
@@ -32,12 +42,26 @@ def remove_visited_commit(commits, merge_commits):
 def get_current_head(commits):
     # Assume the first commit in the list is head
     # TODO: Make sure it works
-    return list(commits)[0]
+
+    # With the branch_commits list in order
+    # the head of the commits list should be
+    # the current head after the visited 
+    # merge commits are removed from the list
+
+    # I found that using the branch_head's first parent
+    # would not work for Rebase merge requests
+    return commits[0]
 
 
 # Check if the commits' signature is valid
-def validate_commit_signature(commit):
-    return True
+def validate_commit_signature(repo, commit):
+    # res is a string containing a single
+    # letter status code for the signature.
+    # Can be G, B, or N for good, bad, or no
+    # signature
+    res = repo.git.show(commit.hexsha, 
+        "--pretty=%G?")
+    return res == 'G'
 
 
 # Check if he commit has multiple parents
@@ -87,8 +111,8 @@ def find_group_membership(committer):
 
 # Extrcact all review units in a commit
 def get_review_units(commit):
-    return re.findall(f"[\s\S]*?[\n]?score.*\n\
-        .*\n{PGP_START}[\s\S]+?{PGP_END}", 
+    return re.findall(f"[\s\S]*?[\n]?score.*\n"
+        f".*\n{PGP_START}[\s\S]+?{PGP_END}\n", 
         commit.message)
 
 
@@ -100,7 +124,7 @@ def has_review_units(commit):
 
 # Extract PR's commits in a REBASE
 def get_rebase_commits(repo, commit):
-    merge_commits = []
+    merge_commits = [commit]
     first_review_found = False
 
     # Traverse all of the ancestors of the initial commit
@@ -125,9 +149,9 @@ def get_rebase_commits(repo, commit):
 
 
 # Extract commits in a PR
-def get_pr_commits(server, repo, parents):
-    merge_commits = []
-
+def get_pr_commits(server, repo, commit):
+    merge_commits = [commit]
+    parents = commit.parents
     # Get common ancestor of two parents
     common_ancestor = repo.merge_base(parents[0], parents[1])[0]
 
@@ -188,13 +212,13 @@ def github_extract_merge_request_commits(repo, commit):
     else:
         # MERGE:
         # Commits with two parents
-        merge_commits = get_pr_commits(repo, parents)
+        merge_commits = get_pr_commits(repo, commit)
 
-    return {
+    return [
         commit_type,
         merge_commits,
         review_units
-    }
+    ]
 
 
 # Extract the Gerrit merge requests' commits
@@ -232,11 +256,11 @@ def gerrit_extract_merge_request_commits(repo, commit):
         # Commits with two parents
         merge_commits = [commit, parents[1]]
 
-    return {
+    return [
         commit_type,
         merge_commits,
         review_units
-    }
+    ]
 
 
 # Extract the merge requests' commits
