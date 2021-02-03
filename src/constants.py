@@ -7,7 +7,7 @@ GITHUB = 'github'
 # Gerrit
 CONFIG_BRANCH = 'refs/meta/config'
 CONFIG_PROJECT = 'project.config'
-CONFIG_GROUP = 'groups'
+CONFIG_GROUPS = 'groups'
 CONFIG_RULES = 'rules.pl'
 ALL_PROJECTS = 'All-Projects'
 GERRIT = 'gerrit'

@@ -59,17 +59,17 @@ def check_gerrit_labels(crp, review_units):
     label = gerrit_extract_labels(crp)
     rule = GERRIT_LABELS[label.upper()]
 
-    #TODO: Extract config file from crp
-    project_config = parse_crp(crp)
+    project_config = parse_crp(crp)[CONFIG_PROJECT]
 
     status = "MAY"
     if rule["isRequired"]:
         status = "NEED"
 
     for item in review_units:
-        review, reviewer, signature = item
-        score, comment = review
-        if score == 0:
+        signature, review = split_review_unit(item)
+        comment, score, reviewer = parse_review(review)
+
+        if score == '0':
             continue
 
         if rule["isBlock"] and is_max_negative(project_config, score):

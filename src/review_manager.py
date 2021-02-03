@@ -5,7 +5,7 @@
 from crypto_manager import gpg_sign_message, gpg_verify_signature
 from constants import PGP_START
 from tempfile import NamedTemporaryFile
-
+import re
 
 class Review:
     def __init__(self, score, comment = None):
@@ -135,4 +135,24 @@ def split_review_unit(review_unit):
     return [
         signature,
         review
+    ]
+
+
+# Parse a review into the comment, score, reviewer info.
+def parse_review(review):
+    # Save relevant info. into capture groups
+    parsed_review = re.search(
+        '([\s\S]+?)score ([+-]?[0-9]+?)\n([\s\S]+?) <([\s\S]+?)>', 
+        review
+    )
+    comment, score, reviewer_name, reviewer_email \
+        = parsed_review.groups()
+
+    return [
+        comment,
+        score,
+        {
+            'name': reviewer_name,
+            'email': reviewer_email
+        }
     ]
