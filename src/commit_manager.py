@@ -58,7 +58,7 @@ def validate_commit_signature(repo, commit):
     # res is a string containing a single
     # letter status code for the signature.
     # Can be G, B, or N for good, bad, or no
-    # signature
+    # signature to name a few
     res = repo.git.show(commit.hexsha, 
         "--pretty=%G?")
     return res == 'G'
@@ -76,12 +76,14 @@ def has_direct_push_permission(committer, permissions):
     ap_head = get_branch_head(ALL_PROJECTS, CONFIG_BRANCH)
     project_config = get_blob_content(ALL_PROJECTS, ap_head, CONFIG_PROJECT)
 
-    committers_groups = find_group_membership(committer)
-
+    committers_groups = find_group_membership(
+        committer.name,
+        committer.email
+    )
     # Extract the 'refs/heads/*' access rights which contains
     # the groups that are allowed to direct push onto ALL branches
-    access_rights = re.findall("\[access \"refs/heads/\*\"\]"
-        "[\s\S]+?(?=\[)", project_config)[0]
+    access_rights = re.search("\[access \"refs/heads/\*\"\]"
+        "[\s\S]+?(?=\[)", project_config).group()
 
     # Check each group to see if one has the direct push permission
     for g in committers_groups:
@@ -92,7 +94,7 @@ def has_direct_push_permission(committer, permissions):
 
 
 # Find the groups that a committer is in
-def find_group_membership(committer):
+def find_group_membership(committer_name, committer_email):
     # Get all of the groups in the Gerrit project
     groups = list_groups()
     committers_groups = []
@@ -101,8 +103,8 @@ def find_group_membership(committer):
         g_id = groups[g]['group_id']
         for member in get_group_info(g_id)['members']:
             if (
-                member['name'] == committer.name
-                and member['email'] == committer.email
+                member['name'] == committer_name
+                and member['email'] == committer_email
             ):
                 committers_groups.append(g)
     
