@@ -13,8 +13,31 @@ def github_parse_crp(crp):
 
 # Check if the merger is authorized
 def is_authorized_merger(crp, commits):
-    #TODO
-    return True
+    access_rights = re.search("\[access \"refs/heads/\*\"\]"
+        "[\s\S]+?(?=\[)", project_config
+    ).group()
+
+    committer = commits[0].committer
+    committers_groups = find_group_membership(
+        committer.name,
+        committer.email
+    )
+    
+    if not committers_groups:
+        return False
+    else:
+        for g in committers_groups:
+            # Check if the committer belongs to a 
+            # group that is allowed to push changes
+            # for code review
+            match = re.search(
+                f"submit = group {g}",
+                access_rights
+            )
+            if not match:
+                return False
+
+        return True
 
 
 # Check if the committer is authorized
