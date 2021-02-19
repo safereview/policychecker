@@ -142,7 +142,7 @@ def split_review_unit(review_unit):
 def parse_review(review):
     # Save relevant info. into capture groups
     parsed_review = re.search(
-        '([\s\S]+?)score ([+-]?[0-9]+?)\n([\s\S]+?) <([\s\S]+?)>', 
+        '([\s\S]+?)\nscore ([+-]?[0-9]+?)\n(.*) <(.*)>', 
         review
     )
     comment, score, reviewer_name, reviewer_email \
