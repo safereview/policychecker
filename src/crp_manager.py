@@ -34,10 +34,10 @@ def is_authorized_merger(crp, commits):
                 f"submit = group {g}",
                 access_rights
             )
-            if not match:
-                return False
+            if match:
+                return True
 
-        return True
+        return False
 
 
 # Check if the committer is authorized
