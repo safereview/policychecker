@@ -185,16 +185,13 @@ def validate_github_crp(repo, branch):
 
 	# Get Branch Protection Rules
 	rules = get_branch_protection_rules(REST, HEADERS, USER, repo, branch)
-	print(rules)
 
 	# Form the CRP
 	crp = form_github_crp(REST, USER, repo, branch)
-	print(crp)
 
 	# Sign and Store the CRP
 	crp_signature, verify_key = ed25519_sign_message(crp)
 	result = store_crp_signature(REST, USER, repo, 'HEAD', crp_signature)
-	print(result)
 
 	# Retrieve and Verify CRP
 	retrieved_signature = get_crp_signature(REST, USER, repo, 'HEAD')

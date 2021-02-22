@@ -3,12 +3,31 @@ from configs.gerrit_config import *
 from configs.github_config import *
 from crypto_manager import ed25519_sign_message
 from gerrit_API import *
-from github_API import *
 from commit_manager import find_group_membership
 
-# Parse the GitHub CRP
-def github_parse_crp(crp):
-    return 0
+
+# Check if the committer has the direct push permission
+def has_push_permission(committer, permissions):
+    # Get the project config with an API call
+    # This code is for testing purposes only
+    ap_head = get_branch_head(ALL_PROJECTS, CONFIG_BRANCH)
+    project_config = get_blob_content(ALL_PROJECTS, ap_head, CONFIG_PROJECT)
+
+    committers_groups = find_group_membership(
+        committer.name,
+        committer.email
+    )
+    # Extract the 'refs/heads/*' access rights which contains
+    # the groups that are allowed to direct push onto ALL branches
+    access_rights = re.search("\[access \"refs/heads/\*\"\]"
+        "[\s\S]+?(?=\[)", project_config).group()
+
+    # Check each group to see if one has the direct push permission
+    for g in committers_groups:
+        if f"push = group {g}" in access_rights:
+            return True
+
+    return False
 
 
 # Check if the merger is authorized
@@ -136,24 +155,6 @@ def is_allowed_to_approve(crp, reviewer):
     return False
 
 
-# Check if there are minimum number of approavals
-def check_min_approvals(crp, review_units):
-    #TODO
-    return True
-
-
-# Check if there reviews from certain users
-def check_required_reviews(crp, review_units):
-    #TODO
-    return True
-
-
-# Check if the review dismissal is followed
-def check_review_dismissal(crp, review_units):
-    #TODO
-    return True
-
-
 # Find the max positive score
 def get_max_positive(project_config):
     return get_gerrit_scores(project_config)[-1]
@@ -192,6 +193,18 @@ def is_max_negative (project_config, score):
     return score == get_max_negative(project_config)
 
 
+# Find the Gerrit's default policy
+def get_gerrit_default_policy(crp):
+    parsed_crp = gerrit_parse_crp(crp)
+
+    # Extract the default policy from the project config
+    default_policy = re.search("function.*\n", 
+        parsed_crp[CONFIG_PROJECT]
+    ).group()
+
+    return default_policy.split("=")[1].strip()
+
+
 # Parse the Gerrit CRP
 def gerrit_parse_crp(crp):
     # Split CRP into an array containing the three components
@@ -208,12 +221,54 @@ def gerrit_parse_crp(crp):
     }
 
 
-def gerrit_extract_labels(crp):
-    parsed_crp = gerrit_parse_crp(crp)
+# Check if the default review policy is followed
+def check_gerrit_labels(crp, review_units):
+    #TODO check if rule is met
+    # https://github.com/GerritCodeReview/gerrit/blob/master/java/com/google/gerrit/server/rules/DefaultSubmitRule.java#L107
+    # https://github.com/GerritCodeReview/gerrit/blob/master/java/com/google/gerrit/entities/LabelFunction.java#L91-#L123
 
-    # Extract the default policy from the pro
-    default_policy = re.search("function.*\n", 
-        parsed_crp[CONFIG_PROJECT]
-    ).group()
+    # Extract the default policy
+    default_policy = get_gerrit_default_policy(crp)
+    rule = GERRIT_LABELS[default_policy.upper()]
 
-    return default_policy.split("=")[1].strip()
+    # TODO: Pass project_config to the function, as it is parsed earlier
+    project_config = gerrit_parse_crp(crp)[CONFIG_PROJECT]
+
+    status = "MAY"
+    if rule["isRequired"]:
+        status = "NEED"
+
+    for item in review_units:
+        signature, review = split_review_unit(item)
+        comment, score, reviewer = parse_review(review)
+
+        if score == '0':
+            continue
+
+        if rule["isBlock"] and is_max_negative(project_config, score):
+            if not is_allowed_to_block(crp, reviewer):
+                exit("Committer is not allowed to block the change")
+            status = "REJECT"
+            return status
+
+        if is_max_positive(project_config, score) or not rule["requiresMaxValue"]:
+            if not is_allowed_to_approve(crp, reviewer):
+                exit("Committer is not allowed to approve the change")
+            status = "MAY"
+
+            if rule["isRequired"]:
+                status = "OK"
+
+    return status
+
+
+# Check if there are minimum number of approavals
+def check_min_approvals(crp, review_units):
+    #TODO
+    return True
+
+
+# Check if there reviews from certain users
+def check_required_reviews(crp, review_units):
+    #TODO
+    return True
