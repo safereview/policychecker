@@ -6,6 +6,7 @@ from github_API import *
 
 # Parse the GitHub CRP
 def github_parse_crp(crp):
+    # TODO: Split CRP into an array containing the three components
     return 0
 
 # Check if there are minimum number of approavals
