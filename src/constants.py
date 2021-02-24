@@ -4,6 +4,13 @@ GITATTRIBUTES = ".gitattributes"
 GITHUB_API = "https://api.github.com/repos"
 GITHUB = 'github'
 
+GITHUB_REQURIED_REVIEWS = 'required_pull_request_reviews'
+GITHUB_MIN_APPROALS = 'required_approving_review_count'
+GITHUB_DISMISS_STALE_REVIEWS = 'dismiss_stale_reviews'
+GITHUB_CODE_OWNER_REVIEWS = 'require_code_owner_reviews'
+GITHUB_ENFORCE_ADMIN = 'enforce_admins'
+
+
 # Gerrit
 CONFIG_BRANCH = 'refs/meta/config'
 CONFIG_PROJECT = 'project.config'
