@@ -130,9 +130,7 @@ def _form_gerrit_crp(g, project):
     except Exception:
         pass
 
-	#TODO:
-	#	- Strip all strings
-	# 	-DOC: The CRP format is as follows:
+	#TODO: Add DOC for the CRP format
     crp = f"{rules_pl}{project_config}{groups}"
     return crp.encode()
 
@@ -148,7 +146,7 @@ def validate_gerrit_crp(repo, branch):
     # TODO: Remove this part
 	# Sign and Store the CRP
 	crp_signature, verify_key = ed25519_sign_message(crp)
-	result = store_crp_signature(REST, repo, crp_signature)
+	store_crp_signature(REST, repo, crp_signature)
 
 	# Retrieve and Verify CRP
 	retrieved_signature = _get_crp_signature(REST, repo)

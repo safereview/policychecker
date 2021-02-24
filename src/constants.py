@@ -1,6 +1,6 @@
 # GitHub
 CODEOWNERS = ".github/CODEOWNERS"
-GITATTRIBUTES = ".git/info/attributes"
+GITATTRIBUTES = ".gitattributes"
 GITHUB_API = "https://api.github.com/repos"
 GITHUB = 'github'
 

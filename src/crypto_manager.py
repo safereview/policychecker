@@ -74,7 +74,7 @@ def generate_key():
     )
 
     # Save PEM file for future verify key retrieval
-    f = open(ED25519_KEY, "w")
+    f = open(f"{KEYS_DIR}/{ED25519_KEY}", "w")
     f.write(pem_str)
     f.close()
     
