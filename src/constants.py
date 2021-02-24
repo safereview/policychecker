@@ -1,6 +1,6 @@
 # GitHub
 CODEOWNERS = ".github/CODEOWNERS"
-GITATTRIBUTES = ".git/info/attributes"
+GITATTRIBUTES = ".gitattributes"
 GITHUB_API = "https://api.github.com/repos"
 GITHUB = 'github'
 
@@ -25,7 +25,8 @@ PGP_END = '-----END PGP SIGNATURE-----'
 # TODO: Make it work for any condition in particular
 # when there is no existing keys at ~/.gnupg/
 #'C:\\Users\\hye\\.gnupg'
-GPGHOME = '/home/hmd/.gnupg'
+KEYS_DIR = '/home/hmd/.gnupg'
+ED25519_KEY = 'ed25519_pub_key.pem'
 
 # Gerrit Rules
 GERRIT_LABELS = {

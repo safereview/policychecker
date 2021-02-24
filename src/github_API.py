@@ -79,31 +79,39 @@ def get_crp_signature(g, user, repo, sha):
 	_list = list()
 	for obj in stati:
 		_list.append(obj)
-		return _list[0].description  # get latest status check
-		# print(f"{obj}\n\t{type(obj)}")
+		# get latest status check
+		return _list[0].description
 
 
 # Get branch protection rules
-def get_branch_protection_rules(g, headers, user, repo, branch_name):
-	#FIXME: What if the user pass a Branch which is not protected
+def get_branch_protection_rules(g, user, repo, branch_name):
+	# GitHub HEADERS
+	headers = {
+		'Authorization': f"token {TOKEN}",
+		"Accept" : "application/vnd.github.luke-cage-preview+json"
+	}
 
+	result = dict()
+
+	# Check for signed commits and if admins should follow the CRP
+	# FIXME: Add try catch to check if the Branch is protected
+	branch_info = get_branch(g, user, repo, branch_name)
+	result['require_signed_commits'] = branch_info.get_required_signatures()
+	result['include_administrators'] = branch_info.get_admin_enforcement()
+
+	# Check if 'Require pull request reviews before merging' is enabled
+	# If so, then
+	# - Get the minimum number of approvals
+	# - Check if 'Dismiss stale pull request' is enabled
+	# - Check if 'Require review from Code Owners' is enabled
 	endpoint = f"{user}/{repo}/branches/{branch_name}/protection"
 	rules = get_request(endpoint, headers)
-
-	#TODO: DOC
-	result = dict()
 	if(rules.ok):
-		rules_json = json.loads(rules.content)
-		result['require_linear_history'] = rules_json["required_linear_history"]['enabled']
-		result['allow_force_pushes'] = rules_json["allow_force_pushes"]['enabled']
-		result['allow_deletions'] = rules_json["allow_deletions"]['enabled']
-
-		#TODO: We try the rules_dump becasue
 		try:
 			rules_dump = json.dumps(rules.json())
 			dismiss_stale = bool(re.search('"dismiss_stale_reviews": true', rules_dump))
 			require_codeowners = bool(re.search('"require_code_owner_reviews": true', rules_dump))
-			# get the minimum number of approvals: count
+
 			review_count = int(re.search('"required_approving_review_count": \d', rules_dump).group()[-1])
 			result['require_pull_request_review'] = {}
 			result['require_pull_request_review']['enabled'] = True
@@ -113,8 +121,17 @@ def get_branch_protection_rules(g, headers, user, repo, branch_name):
 		except Exception:
 			result['require_pull_request_review'] = False
 
+		'''
+		# Additional rules that we may decide to include in CRP
+		rules_json = json.loads(rules.content)
+		result['require_linear_history'] = rules_json["required_linear_history"]['enabled']
+		result['allow_force_pushes'] = rules_json["allow_force_pushes"]['enabled']
+		result['allow_deletions'] = rules_json["allow_deletions"]['enabled']
+		'''
 
-	#TODO: DOC
+	'''
+	# Additional rules that we may decide to include in CRP
+	# Check for the status check
 	endpoint = f"{user}/{repo}/branches/{branch_name}"
 	branch_info = get_request(endpoint, headers)
 
@@ -129,13 +146,7 @@ def get_branch_protection_rules(g, headers, user, repo, branch_name):
 			result['require_status_checks'] = {}
 			result['require_status_checks']['enabled'] = True
 			result['require_status_checks']['strict'] = check_strict
-
-	#TODO: Get other rules using a new API call, why?
-	# Get additional rules
-	branch_info = get_branch(g, user, repo, branch_name)
-	result['require_signed_commits'] = branch_info.get_required_signatures()
-	result['include_administrators'] = branch_info.get_admin_enforcement()
-
+	'''
 	return result
 
 
@@ -143,32 +154,31 @@ def get_branch_protection_rules(g, headers, user, repo, branch_name):
 def form_github_crp(g, user, repo, branch_name):
 
 	#Github CRP
-	gitattr = ""
+	gitattributes = ""
 	codeowners = ""
 	protection_rules = {}
 
 	try:
-		gitattributes = get_blob_content(REST, USER, repo, GITATTRIBUTES)
+		#TODO: Check if we need to capture the entire gitattributes
+		gitattributes = get_blob_content(g, user, repo, GITATTRIBUTES)
 	except Exception:
-		# print("error in gitattr")
+		print("error in gitattr")
 		pass
 
 	try:
 		codeowners = get_blob_content(g, user, repo, CODEOWNERS)
 	except Exception:
-		# print("error in codeowners")
+		print("error in codeowners")
 		pass
 
 	try:
 		protection_rules = get_branch_protection_rules(g, user, repo, branch_name)
 	except Exception:
-		# print("error in protections")
+		print("error in protections")
 		pass
 
-	#TODO:
-	#	- Strip all strings
-	# 	-DOC: The CRP format is as follows:
-	crp = f"[{protection_rules},{codeowners},{gitattr}]"
+	#TODO: Add DOC for the CRP format
+	crp = f"{protection_rules}{codeowners}{gitattributes}"
 	return crp.encode()
 
 
@@ -177,24 +187,12 @@ def validate_github_crp(repo, branch):
 	# GitHub REST API call
 	REST = Github(TOKEN)
 
-	# GitHub HEADERS
-	HEADERS = {
-		'Authorization': f"token {TOKEN}",
-		"Accept" : "application/vnd.github.luke-cage-preview+json"
-		}
-
-	# Get Branch Protection Rules
-	rules = get_branch_protection_rules(REST, HEADERS, USER, repo, branch)
-	print(rules)
-
 	# Form the CRP
 	crp = form_github_crp(REST, USER, repo, branch)
-	print(crp)
 
 	# Sign and Store the CRP
 	crp_signature, verify_key = ed25519_sign_message(crp)
-	result = store_crp_signature(REST, USER, repo, 'HEAD', crp_signature)
-	print(result)
+	store_crp_signature(REST, USER, repo, 'HEAD', crp_signature)
 
 	# Retrieve and Verify CRP
 	retrieved_signature = get_crp_signature(REST, USER, repo, 'HEAD')

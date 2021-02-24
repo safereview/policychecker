@@ -5,7 +5,7 @@ from nacl.encoding import HexEncoder, Base64Encoder
 from nacl.signing import SigningKey, VerifyKey
 from nacl.exceptions import BadSignatureError
 
-from constants import GPGHOME
+from constants import KEYS_DIR, ED25519_KEY
 import re
 
 # Load public key info from a local path
@@ -31,8 +31,7 @@ def load_local_pub_keys(local_path):
 
     # Search for any Ed25519 verify key files
     # and store the created VerifyKey objects
-    ed25519_key_path = \
-        local_path + '/crp_verify_key.pem'
+    ed25519_key_path = f"{local_path}/{ED25519_KEY}"
     try:
         with open(ed25519_key_path, 'r') as f:
             content = f.read()
@@ -75,7 +74,7 @@ def generate_key():
     )
 
     # Save PEM file for future verify key retrieval
-    f = open("crp_verify_key.pem", "w")
+    f = open(f"{KEYS_DIR}/{ED25519_KEY}", "w")
     f.write(pem_str)
     f.close()
     
@@ -122,11 +121,11 @@ def ed25519_sign_message(crp):
 
 # Sign a message using the gpg signature
 def gpg_sign_message(message):
-    gpg = GPG(gnupghome=GPGHOME)
+    gpg = GPG(gnupghome = KEYS_DIR)
     return gpg.sign(message, detach=True)
 
 
 # Verify a gpg signature
 def gpg_verify_signature(signature_file, message):
-    gpg = GPG(gnupghome=GPGHOME)
+    gpg = GPG(gnupghome = KEYS_DIR)
     return gpg.verify_data(signature_file, message)

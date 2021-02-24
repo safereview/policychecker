@@ -69,30 +69,6 @@ def has_multiple_parents(commit):
     return len(commit.parents) > 1
 
 
-# Check if the committer has the push permission
-def has_direct_push_permission(committer, permissions):
-    # Get the project config with an API call
-    # This code is for testing purposes only
-    ap_head = get_branch_head(ALL_PROJECTS, CONFIG_BRANCH)
-    project_config = get_blob_content(ALL_PROJECTS, ap_head, CONFIG_PROJECT)
-
-    committers_groups = find_group_membership(
-        committer.name,
-        committer.email
-    )
-    # Extract the 'refs/heads/*' access rights which contains
-    # the groups that are allowed to direct push onto ALL branches
-    access_rights = re.search("\[access \"refs/heads/\*\"\]"
-        "[\s\S]+?(?=\[)", project_config).group()
-
-    # Check each group to see if one has the direct push permission
-    for g in committers_groups:
-        if f"push = group {g}" in access_rights:
-            return True
-
-    return False
-
-
 # Find the groups that a committer is in
 def find_group_membership(committer_name, committer_email):
     # Get all of the groups in the Gerrit project
@@ -267,7 +243,7 @@ def gerrit_extract_merge_request_commits(repo, commit):
 
 # Extract the merge requests' commits
 def extract_review_units(server, repo, commit):
-if server == GITHUB:
-    return github_extract_merge_request_commits (repo, commit)
-else:
-    return gerrit_extract_merge_request_commits (repo, commit)
+    if server == GITHUB:
+        return github_extract_merge_request_commits (repo, commit)
+    else:
+        return gerrit_extract_merge_request_commits (repo, commit)
