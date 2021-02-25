@@ -11,6 +11,7 @@ from crypto_manager import *
 from collections import defaultdict
 
 
+# Headers for different requests
 HEADERS = {
 	'Authorization': f"token {TOKEN}",
 	"Accept" : "application/vnd.github.zzzax-preview+json"
@@ -26,21 +27,25 @@ PRT_HEADERS = {
 	"Accept" : "application/vnd.github.luke-cage-preview+json"
 }
 
+
 # Form a get request
 def get_request(endpoint, headers = HEADERS):
-	try:
-		return requests.get(f"{GITHUB_API}/{endpoint}", headers = headers)
-	except Exception:
-		pass
+	return requests.get(f"{GITHUB_API}/{endpoint}", headers = headers)
 
 
-# Get info about one branch
+# Form a post request
+def post_request(endpoint, data, headers = HEADERS):
+	return requests.post(f"{GITHUB_API}/{endpoint}", data = data, headers = headers)
+
+
+# Get branch info
 def get_branch(g, user, repo, branch):
-	repo_name = f"{user}/{repo}"
-	return g.get_repo(repo_name).get_branch(branch)
+	endpoint = f"{user}/{repo}/branches/{branch}"
+	response = get_request(endpoint)
+	return  json.loads(response.content)
 
 
-# Get file content
+# Get the file content
 def get_blob_content(g, user, repo, path):
 	endpoint = f"{user}/{repo}/contents/{path}"
 	response = get_request(endpoint)
@@ -48,17 +53,17 @@ def get_blob_content(g, user, repo, path):
 	return requests.get(response["download_url"]).content
 
 
-# Store the crp signature as review label on the server
-def store_crp_signature(g, user, repo, sha, signature):
-	repo_name = "{}/{}".format(user, repo)
-	repo = g.get_repo(repo_name)
-	res = repo.get_commit(sha=sha).create_status(
-		state = "success",
-		#target_url="https://myURL.com",
-		context = "CODE_REVIEW_POLICY",
-		description = signature
-	)
-	return res
+# Create a status check
+def create_status(g, user, repo, sha, status, context, description):
+	endpoint = f"{user}/{repo}/statuses/{sha}"
+	data = {
+		'state': status,
+		'context': context,
+		'description': description
+		}
+	data = json.dumps(data)
+
+	return post_request(endpoint, data, POST_HEADERS)
 
 
 # Retrive the crp signature from the Gerrit server
@@ -164,18 +169,18 @@ def validate_github_crp(repo, branch):
 
 	# Form the CRP
 	crp = form_github_crp(REST, USER, repo, branch)
-	print(crp)
 
     # TODO: Remove this part
-	# Sign and Store the CRP
+	# Sign and Store the CRP as a status check
 	crp_signature, verify_key = ed25519_sign_message(crp)
-	store_crp_signature(REST, USER, repo, 'HEAD', crp_signature)
+	branch = get_branch(REST, USER, repo, branch)
+	head = branch['commit']['sha']
+	create_status(
+		REST, USER, repo, head,
+		'success', 'CODE_REVIEW_POLICY', crp_signature
+		)
 
 	# Retrieve and Verify CRP
-	retrieved_signature = get_crp_signature(REST, USER, repo, 'HEAD')
+	# TODO: We should pass head as parameters
+	retrieved_signature = get_crp_signature(REST, USER, repo, head)
 	return crp, verify_signature(crp, retrieved_signature, verify_key)
-
-
-if __name__ == "__main__":
-	REST = Github(TOKEN)
-	validate_github_crp('test-repo', 'main')
