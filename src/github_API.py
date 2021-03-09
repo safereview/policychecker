@@ -184,3 +184,19 @@ def validate_github_crp(repo, branch):
 	# TODO: We should pass head as parameters
 	retrieved_signature = get_crp_signature(REST, USER, repo, head)
 	return crp, verify_signature(crp, retrieved_signature, verify_key)
+
+
+# Get collaborators for a GitHub repo
+def get_collaborators(user, repo):
+	endpoint = f"{user}/{repo}/collaborators"
+	response = get_request(endpoint)
+	content = json.loads(response.content)
+
+	collaborators = {}
+	for user_info in content:
+		# Create an entry for each user
+		# containing their repo permissions
+		collaborators[user_info['login']] = \
+			user_info['permissions']
+
+	return collaborators
