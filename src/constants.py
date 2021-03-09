@@ -1,6 +1,7 @@
 # GitHub
 CODEOWNERS = ".github/CODEOWNERS"
 GITATTRIBUTES = ".gitattributes"
+PROTECTION_RULES = "ProtectionRules"
 GITHUB_API = "https://api.github.com/repos"
 GITHUB = 'github'
 
