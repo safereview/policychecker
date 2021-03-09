@@ -222,7 +222,7 @@ def gerrit_parse_crp(crp):
 
 
 # Check if the default review policy is followed
-def check_gerrit_labels(crp, review_units):
+def is_submittable(crp, review_units):
     #TODO check if rule is met
     # https://github.com/GerritCodeReview/gerrit/blob/master/java/com/google/gerrit/server/rules/DefaultSubmitRule.java#L107
     # https://github.com/GerritCodeReview/gerrit/blob/master/java/com/google/gerrit/entities/LabelFunction.java#L91-#L123

@@ -104,7 +104,7 @@ def validate_review_signature(review_unit, previous_signature = None):
 
 
 # Check if the chain of reviews is valid
-def validate_review_chain(review_units):
+def validate_review_signatures(review_units):
     previous_signature = ""
 
     # Iterate through the list in reverse order as

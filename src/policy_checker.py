@@ -47,7 +47,7 @@ from review_manager import *
 
 
 # Check if the reviews created on GitHub are legitimate
-def github_validate_reviews(merge_commits, review_units):
+def github_validate_reviews(crp, review_units):
     return True
 
 
@@ -75,33 +75,30 @@ def gerrit_validate_reviews(crp, review_units):
 
 # Check if the review units are legitimate
 def validate_reviews(server, crp, merge_commit_type, merge_commits, review_units):
-    # Check if review units have valid signature
-    if not validate_reviews_signatures(review_units):
+    # Check if code reviews have valid signature 
+    # and the chain of code reviews is valid.
+    if not validate_review_units(review_units):
         return False
-
-    # Check if review chain is valid
-    if not validate_review_chain(review_units):
-        return False
-
-    # Check for the first commit and direct pushes
-    if merge_commit_type == FIRSTCOMMIT:
-        return True
-    elif merge_commit_type == DIRECTPUSH:
-        return check_direct_push(merge_commits)
 
     # Check if the merger has the permission
     if not is_authorized_merger(crp, merge_commits):
         return False
 
-    #Check if the author of code was authorized
+    # Check for the first commit and the direct push
+    if merge_commit_type == FIRSTCOMMIT:
+        return True
+    if merge_commit_type == DIRECTPUSH:
+        return check_direct_push(merge_commits)
+
+    # Check if the author of code was authorized
     if not is_authorized_committer(crp, merge_commits):
         return False
 
     # Check if policy rules are violated
     if server == GITHUB:
-        return github_validate_reviews(merge_commits, review_units)
+        return github_validate_reviews(crp, review_units)
     else:
-        return gerrit_validate_reviews(merge_commits, review_units)
+        return gerrit_validate_reviews(crp, review_units)
 
 
 # Validate all reviews in a branch
