@@ -46,59 +46,23 @@ from gerrit_crp_manager import *
 from review_manager import *
 
 
-# Check if the reviews created on GitHub are legitimate
-def github_validate_reviews(crp, review_units):
-    return True
-
-
-# Check if the reviews created on GitHub are legitimate
-def gerrit_validate_reviews(crp, review_units):
-
-    # Check if there are customized rules
-    rules_pl = gerrit_parse_crp(crp)[CONFIG_RULES]
-    if rules_pl != '':
-        # FIXME:
-        exit('Customized rules!')
-
-    # Check if the basic rules (based on labels) are met
-    # Make decision based on the status
-    #https://github.com/GerritCodeReview/gerrit/blob/master/java/com/google/gerrit/server/rules/DefaultSubmitRule.java#L110
-    status = is_submittable(crp, review_units)
-    # TODO: Ensure it works for any situations
-    if status != "OK":
-        return False
-
-    # TODO: Check for other policies if needed
-    
-    return True
-
-
 # Check if the review units are legitimate
-def validate_reviews(server, crp, merge_commit_type, merge_commits, review_units):
+def validate_reviews(server, crp, review_info):
+    merge_method, merge_commits, review_units = review_info
     # Check if code reviews have valid signature 
     # and the chain of code reviews is valid.
-    if not validate_review_units(review_units):
-        return False
-
-    # Check if the merger has the permission
-    if not is_authorized_merger(crp, merge_commits):
+    if not validate_review_signatures(review_units):
         return False
 
     # Check for the first commit and the direct push
-    if merge_commit_type == FIRSTCOMMIT:
+    if merge_method == FIRSTCOMMIT:
         return True
-    if merge_commit_type == DIRECTPUSH:
-        return check_direct_push(merge_commits)
-
-    # Check if the author of code was authorized
-    if not is_authorized_committer(crp, merge_commits):
-        return False
 
     # Check if policy rules are violated
     if server == GITHUB:
-        return github_validate_reviews(crp, review_units)
+        return github_validate_reviews(crp, merge_commits, review_units)
     else:
-        return gerrit_validate_reviews(crp, review_units)
+        return gerrit_validate_reviews(crp, merge_commits, review_units)
 
 
 # Validate all reviews in a branch
@@ -137,13 +101,15 @@ def validate_branch(server, repo, branch):
     # Extract the commits in the merge request that
     # corresponds to the current branch head
     while commits:
-        merge_commit_type, merge_commits, review_units = extract_review_units(server, repo, branch_head)
-        if not validate_reviews(server, crp, merge_commit_type, merge_commits, review_units):
+        # review_info = [merge_method, merge_commits, review_units]
+        review_info = extract_review_units(server, repo, branch_head)
+        if not validate_reviews(server, crp, review_info):
             # TODO: Make it more informative per result
             exit('Review Units are not valid')
 
         # Remove commits in merge request from the set Commits
-        remove_visited_commit(commits, merge_commits)
+        # merge_commits: review_info
+        remove_visited_commit(commits, review_info[1])
 
         # Update the head to the head commit of the branch represented
         # by commits left in the set Commits
