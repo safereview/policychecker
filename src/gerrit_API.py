@@ -82,7 +82,7 @@ def find_group_membership(committer_name, committer_email):
     
     return committers_groups
 
-    
+
 # Get a list of groups
 def list_groups(g):
     endpoint = f"groups/"
@@ -169,11 +169,3 @@ def validate_gerrit_crp(repo, branch):
 	# Retrieve and Verify CRP
 	retrieved_signature = _get_crp_signature(REST, repo)
 	return crp, verify_signature(crp, retrieved_signature, verify_key)
-
-
-if __name__ == "__main__":
-    REST = get_rest_api(USER, PASS, url)
-    gr = list_groups(REST)
-    info = get_group_info(REST, 'global:Registered-Users')
-    print(info)
-    

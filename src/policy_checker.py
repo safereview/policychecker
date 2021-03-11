@@ -108,7 +108,7 @@ def validate_branch(server, repo, branch):
             exit('Review Units are not valid')
 
         # Remove commits in merge request from the set Commits
-        # merge_commits: review_info
+        # merge_commits: review_info [1]
         remove_visited_commit(commits, review_info[1])
 
         # Update the head to the head commit of the branch represented

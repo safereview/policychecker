@@ -9,6 +9,7 @@ GITHUB_ENFORCE_ADMIN = 'enforce_admins'
 CODEOWNERS = ".github/CODEOWNERS"
 GITATTRIBUTES = ".gitattributes"
 PROTECTION_RULES = "ProtectionRules"
+COLLABORATORS = 'collaborators'
 
 # Gerrit
 GERRIT = 'gerrit'
