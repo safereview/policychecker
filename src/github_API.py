@@ -39,14 +39,14 @@ def post_request(endpoint, data, headers = HEADERS):
 
 
 # Get branch info
-def get_branch(g, user, repo, branch):
+def get_branch(user, repo, branch):
 	endpoint = f"{user}/{repo}/branches/{branch}"
 	response = get_request(endpoint)
 	return  json.loads(response.content)
 
 
 # Get the file content
-def get_blob_content(g, user, repo, path):
+def get_blob_content(user, repo, path):
 	endpoint = f"{user}/{repo}/contents/{path}"
 	response = get_request(endpoint)
 	response = json.loads(response.content)
@@ -54,7 +54,7 @@ def get_blob_content(g, user, repo, path):
 
 
 # Create a status check
-def create_status(g, user, repo, sha, status, context, description):
+def create_status(user, repo, sha, status, context, description):
 	endpoint = f"{user}/{repo}/statuses/{sha}"
 	data = {
 		'state': status,
@@ -67,7 +67,7 @@ def create_status(g, user, repo, sha, status, context, description):
 
 
 # Retrive the crp signature from the Gerrit server
-def get_crp_signature(g, user, repo, sha):
+def get_crp_signature(user, repo, sha):
 	endpoint = f"{user}/{repo}/statuses/{sha}"
 	response = get_request(endpoint)
 	json_load = json.loads(response.content)
@@ -75,7 +75,7 @@ def get_crp_signature(g, user, repo, sha):
 
 
 # Get branch protection rules
-def get_branch_protection_rules(g, user, repo, branch_name):
+def get_branch_protection_rules(user, repo, branch_name):
 	# NOTE: The branch protection API is in a preview period
 	# During this period, we use different ACCEPT HEADERS per use case
 	# See details @ 
@@ -130,8 +130,24 @@ def get_branch_protection_rules(g, user, repo, branch_name):
 	return result
 
 
+# Get collaborators for a GitHub repo
+def _get_collaborators(user, repo):
+	endpoint = f"{user}/{repo}/collaborators"
+	response = get_request(endpoint)
+	content = json.loads(response.content)
+
+	collaborators = {}
+	for user_info in content:
+		# Create an entry for each user
+		# containing their repo permissions
+		collaborators[user_info['login']] = \
+			user_info['permissions']
+
+	return collaborators
+
+
 	# Form the code revivew policy
-def form_github_crp(g, user, repo, branch_name):
+def form_github_crp(user, repo, branch_name):
 
 	#Github CRP
 	gitattributes = ""
@@ -140,25 +156,32 @@ def form_github_crp(g, user, repo, branch_name):
 
 	try:
 		#TODO: Check if we need to capture the entire gitattributes
-		gitattributes = get_blob_content(g, user, repo, GITATTRIBUTES)
+		gitattributes = get_blob_content(user, repo, GITATTRIBUTES)
 	except Exception:
 		#print("error in gitattr")
 		pass
 
 	try:
-		codeowners = get_blob_content(g, user, repo, CODEOWNERS)
+		codeowners = get_blob_content(user, repo, CODEOWNERS)
 	except Exception:
 		#print("error in codeowners")
 		pass
 
 	try:
-		protection_rules = get_branch_protection_rules(g, user, repo, branch_name)
+		protection_rules = get_branch_protection_rules(user, repo, branch_name)
+	except Exception:
+		#print("error in protections")
+		pass
+
+
+	try:
+		collaborators = _get_collaborators(user, repo)
 	except Exception:
 		#print("error in protections")
 		pass
 
 	#TODO: Add DOC for the CRP format
-	crp = f"{protection_rules}{codeowners}{gitattributes}"
+	crp = f"{protection_rules}{codeowners}{gitattributes}{collaborators}"
 	return crp.encode()
 
 
@@ -184,19 +207,3 @@ def validate_github_crp(repo, branch):
 	# TODO: We should pass head as parameters
 	retrieved_signature = get_crp_signature(REST, USER, repo, head)
 	return crp, verify_signature(crp, retrieved_signature, verify_key)
-
-
-# Get collaborators for a GitHub repo
-def get_collaborators(user, repo):
-	endpoint = f"{user}/{repo}/collaborators"
-	response = get_request(endpoint)
-	content = json.loads(response.content)
-
-	collaborators = {}
-	for user_info in content:
-		# Create an entry for each user
-		# containing their repo permissions
-		collaborators[user_info['login']] = \
-			user_info['permissions']
-
-	return collaborators

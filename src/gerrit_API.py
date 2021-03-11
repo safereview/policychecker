@@ -65,6 +65,24 @@ def list_files(g, project, head):
     return g.get(endpoint = endpoint)
 
 
+# Find the groups that a committer is in
+def find_group_membership(committer_name, committer_email):
+    # Get all of the groups in the Gerrit project
+    groups = list_groups()
+    committers_groups = []
+
+    for g in groups:
+        g_id = groups[g]['group_id']
+        for member in get_group_info(g_id)['members']:
+            if (
+                member['name'] == committer_name
+                and member['email'] == committer_email
+            ):
+                committers_groups.append(g)
+    
+    return committers_groups
+
+
 # Get a list of groups
 def list_groups(g):
     endpoint = f"groups/"

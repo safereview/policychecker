@@ -10,6 +10,18 @@ from gerrit_API import *
 from review_manager import is_first_review
 
 
+# List commits with code changes in a PR
+def get_pr_code_changes(merge_commits):
+    commits = []
+    # The first commit in the list is the HEAD of PR
+    # The second commit is the HEAD's parent
+    # So start from the first commit in the list
+    # Compare each commit with its parent and add it
+    # to commits list if there are code changes
+    # git diff --name-only SHA1 SHA2
+
+    return commits
+
 # List all commits in a branch
 def get_branch_commits(repo, branch):
     branch_commits = []
@@ -33,8 +45,9 @@ def get_branch_head(repo, branch):
 
 
 # Remove visited commits
-def remove_visited_commit(commits, merge_commits):
-    for commit in merge_commits:
+# TODO: Improve this method
+def remove_visited_commit(commits, visited_commits):
+    for commit in visited_commits:
         commits.remove(commit)
 
 
@@ -67,25 +80,7 @@ def validate_commit_signature(repo, commit):
 # Check if he commit has multiple parents
 def has_multiple_parents(commit):
     return len(commit.parents) > 1
-
-
-# Find the groups that a committer is in
-def find_group_membership(committer_name, committer_email):
-    # Get all of the groups in the Gerrit project
-    groups = list_groups()
-    committers_groups = []
-
-    for g in groups:
-        g_id = groups[g]['group_id']
-        for member in get_group_info(g_id)['members']:
-            if (
-                member['name'] == committer_name
-                and member['email'] == committer_email
-            ):
-                committers_groups.append(g)
     
-    return committers_groups
-
 
 # Extrcact all review units in a commit
 def get_review_units(commit):
@@ -154,12 +149,12 @@ def github_extract_merge_request_commits(repo, commit):
 
     merge_commits = []
     review_units = []
-    commit_type = MERGE
+    merge_method = MERGE
 
     # FIRSTCOMMIT:
     # A commit with no parents
     if p == 0:
-        commit_type = FIRSTCOMMIT
+        merge_method = FIRSTCOMMIT
 
     elif p == 1:
         # Add the current commit to merge_commits
@@ -172,13 +167,13 @@ def github_extract_merge_request_commits(repo, commit):
         # DIRECTPUSH
         # Commits with one parent and no review units
         if r == 0:
-            commit_type = DIRECTPUSH
+            merge_method = DIRECTPUSH
 
         # REBASE or SQUASH:
         # Commits with one parent and at least one review unit
         elif r == 1:
             if not is_first_review(review_units):
-                    commit_type = REBASE
+                    merge_method = REBASE
                     merge_commits = get_rebase_commits(repo, commit)
             #else
                 #FIXME: differentiate between REBASE and SQUASH
@@ -186,14 +181,14 @@ def github_extract_merge_request_commits(repo, commit):
         # SQUASH:
         # Commits with one parent and more than one review unit
         else:
-            commit_type = SQUASH
+            merge_method = SQUASH
     else:
         # MERGE:
         # Commits with two parents
         merge_commits = get_pr_commits(repo, commit)
 
     return [
-        commit_type,
+        merge_method,
         merge_commits,
         review_units
     ]
@@ -207,12 +202,12 @@ def gerrit_extract_merge_request_commits(repo, commit):
 
     merge_commits = []
     review_units = []
-    commit_type = MERGE
+    merge_method = MERGE
 
     # FIRSTCOMMIT:
     # A commit with no parents
     if p == 0:
-       commit_type = FIRSTCOMMIT
+       merge_method = FIRSTCOMMIT
 
     elif p == 1:
         # Add the current commit to merge_commits
@@ -225,17 +220,17 @@ def gerrit_extract_merge_request_commits(repo, commit):
         # DIRECTPUSH
         # Commits with one parent and no review units
         if r == 0:
-            commit_type = DIRECTPUSH
+            merge_method = DIRECTPUSH
         else:
             #FIXME: differentiate between merge policies
-            commit_type = ""
+            merge_method = ""
     else:
         # MERGE:
         # Commits with two parents
         merge_commits = [commit, parents[1]]
 
     return [
-        commit_type,
+        merge_method,
         merge_commits,
         review_units
     ]

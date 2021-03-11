@@ -3,45 +3,39 @@ from configs.gerrit_config import *
 from configs.github_config import *
 from crypto_manager import ed25519_sign_message
 from gerrit_API import *
-from commit_manager import find_group_membership
+from commit_manager import get_pr_code_changes
 
 
-# Check if the committer has the direct push permission
-def has_push_permission(committer, permissions):
-    # Get the project config with an API call
-    # This code is for testing purposes only
-    ap_head = get_branch_head(ALL_PROJECTS, CONFIG_BRANCH)
-    project_config = get_blob_content(ALL_PROJECTS, ap_head, CONFIG_PROJECT)
+# Parse the Gerrit CRP
+def _gerrit_parse_crp(crp):
+    # Split CRP into an array containing the three components
+    split_crp = re.split('(\[project\]\n|# UUID)', crp)
+    rules = split_crp[0]
+    # Join the appropriate elements together
+    project_config = ''.join(split_crp[1:3]).rstrip()
+    groups = ''.join(split_crp[3:])
 
-    committers_groups = find_group_membership(
-        committer.name,
-        committer.email
-    )
-    # Extract the 'refs/heads/*' access rights which contains
-    # the groups that are allowed to direct push onto ALL branches
-    access_rights = re.search("\[access \"refs/heads/\*\"\]"
-        "[\s\S]+?(?=\[)", project_config).group()
-
-    # Check each group to see if one has the direct push permission
-    for g in committers_groups:
-        if f"push = group {g}" in access_rights:
-            return True
-
-    return False
+    return {
+        CONFIG_RULES: rules,
+        CONFIG_PROJECT: project_config,
+        CONFIG_GROUPS: groups
+    }
 
 
-# Check if the merger is authorized
-def is_authorized_merger(crp, commits):
-    access_rights = re.search("\[access \"refs/heads/\*\"\]"
-        "[\s\S]+?(?=\[)", project_config
-    ).group()
-
-    committer = commits[0].committer
+# Check if the merger is authorized to perfomr a merge request
+def _is_authorized_merger(project_config, committer):
+    # Get committer group
     committers_groups = find_group_membership(
         committer.name,
         committer.email
     )
     
+    # Extract access rights for the 'refs/heads/*' 
+    # and check if the user has the right permission
+    access_rights = re.search("\[access \"refs/heads/\*\"\]"
+        "[\s\S]+?(?=\[)", project_config
+        ).group()
+
     if not committers_groups:
         return False
     else:
@@ -59,15 +53,18 @@ def is_authorized_merger(crp, commits):
         return False
 
 
-# Check if the committer is authorized
-def is_authorized_committer(crp, commits):
-    # Get the access rights to the refs/for/refs/*
-    # namespace, which is where changes
-    # requesting a code review are pushed to
+# Check if the PR Creator has permission to create a change
+def _is_authorized_author(project_config, merge_commits):
+    # Get commits with code changes in a PR
+    commits = get_pr_code_changes (merge_commits)
+
+    # Extract access rights for the 'refs/for/refs/*' 
+    # and check if the user has the right permission
     access_rights = re.search(
             '\[access "refs\/for\/refs\/\*"\]'
-            '[\s\S]+?(?=\[)', crp
+            '[\s\S]+?(?=\[)', project_config
     ).group()
+
 
     for commit in commits:
         committer = commit.committer
@@ -93,26 +90,47 @@ def is_authorized_committer(crp, commits):
             return True
 
 
+# Check if the committer has the direct push permission
+def _is_authorized_direct_push(project_config, committer):
+    # Get committer group
+    # NOTE: the groups that a user belongs to are retrieved
+    # using the Gerrit API. In the future, the CRP might be 
+    # extended to include each groups' members instead.
+    committers_groups = find_group_membership(
+        committer.name,
+        committer.email
+    )
+
+    # Extract access rights for the 'refs/heads/*' 
+    # and check if the user has the right permission
+    access_rights = re.search("\[access \"refs/heads/\*\"\]"
+        "[\s\S]+?(?=\[)", project_config
+        ).group()
+
+    # TODO: Can we do it more efficiently 
+    for g in committers_groups:
+        if f"push = group {g}" in access_rights:
+            return True
+
+    return False
+
+
 # Check if the committer is allowed to block the change
-def is_allowed_to_block(crp, reviewer):
-    # Note: the groups that a reviewer belongs to
-    # are retrieved using the Gerrit API. In the future,
-    # the CRP might be extended to include each groups'
-    # members instead.
+def _is_allowed_to_block(project_config, reviewer):
+    # Get reviewer group
     committers_groups = find_group_membership(
         reviewer['name'],
         reviewer['email']
     )
 
-    # Extract the refs/heads/* access rights
-    # which contain the code review permissions that 
-    # apply to all branches
+    # Extract access rights for the 'refs/heads/*' 
+    # and check if the user has the right permission
     access_rights = re.search(
         "\[access \"refs/heads/\*\"\]"
-        "[\s\S]+?(?=\[)", crp
-    ).group()
+        "[\s\S]+?(?=\[)", project_config
+        ).group()
 
-    max_negative = get_max_negative(crp)
+    max_negative = _get_max_negative(project_config)
 
     # Check if the committer belongs to a group
     # that is allowed to vote the max negative
@@ -130,19 +148,25 @@ def is_allowed_to_block(crp, reviewer):
 
 
 # Check if the committer is allowed to approve the change
-def is_allowed_to_approve(crp, reviewer):
+def _is_allowed_to_approve(project_config, reviewer):
+    # Get reviewer group
     committers_groups = find_group_membership(
         reviewer['name'],
         reviewer['email']
     )
 
+    # Extract access rights for the 'refs/heads/*' 
+    # and check if the user has the right permission
     access_rights = re.search(
         "\[access \"refs/heads/\*\"\]"
-        "[\s\S]+?(?=\[)", crp
+        "[\s\S]+?(?=\[)", project_config
     ).group()
 
-    max_positive = get_max_positive(crp)
+    max_positive = _get_max_positive(crp)
 
+    # Check if the committer belongs to a group
+    # that is allowed to vote the max positive
+    # score and thus approve a change
     for g in committers_groups:
         match = re.search(
             "label-Code-Review = "
@@ -155,18 +179,8 @@ def is_allowed_to_approve(crp, reviewer):
     return False
 
 
-# Find the max positive score
-def get_max_positive(project_config):
-    return get_gerrit_scores(project_config)[-1]
-
-
-# Find the max negative score
-def get_max_negative(project_config):
-    return get_gerrit_scores(project_config)[0]
-
-
 # Get a sorted list of all score options
-def get_gerrit_scores(project_config):
+def _get_gerrit_scores(project_config):
     # Extract code review settings
     code_review_label = re.search(
         '(?<=\[label "Code-Review"\])[\s\S]+?(?=\[)',
@@ -183,59 +197,52 @@ def get_gerrit_scores(project_config):
     return sorted(scores, key = int)
 
 
+# Find the max positive score
+def _get_max_positive(project_config):
+    return _get_gerrit_scores(project_config)[-1]
+
+
+# Find the max negative score
+def _get_max_negative(project_config):
+    return _get_gerrit_scores(project_config)[0]
+
+
 # Check if the score is max positive
-def is_max_positive (project_config, score):
-    return score == get_max_positive(project_config)
+def _is_max_positive (project_config, score):
+    return score == _get_max_positive(project_config)
 
 
 # Check if the score is max negative
-def is_max_negative (project_config, score):
-    return score == get_max_negative(project_config)
+def _is_max_negative (project_config, score):
+    return score == _get_max_negative(project_config)
 
 
 # Find the Gerrit's default policy
-def get_gerrit_default_policy(crp):
-    parsed_crp = gerrit_parse_crp(crp)
+def _get_gerrit_default_policy(project_config):
 
     # Extract the default policy from the project config
     default_policy = re.search("function.*\n", 
-        parsed_crp[CONFIG_PROJECT]
+        project_config
     ).group()
 
     return default_policy.split("=")[1].strip()
 
 
-# Parse the Gerrit CRP
-def gerrit_parse_crp(crp):
-    # Split CRP into an array containing the three components
-    split_crp = re.split('(\[project\]\n|# UUID)', crp)
-    rules = split_crp[0]
-    # Join the appropriate elements together
-    project_config = ''.join(split_crp[1:3]).rstrip()
-    groups = ''.join(split_crp[3:])
-
-    return {
-        CONFIG_RULES: rules,
-        CONFIG_PROJECT: project_config,
-        CONFIG_GROUPS: groups
-    }
-
-
 # Check if the default review policy is followed
-def check_gerrit_labels(crp, review_units):
-    #TODO check if rule is met
+def is_submittable(crp, review_units):
+    #TODO check if a rule is met
     # https://github.com/GerritCodeReview/gerrit/blob/master/java/com/google/gerrit/server/rules/DefaultSubmitRule.java#L107
     # https://github.com/GerritCodeReview/gerrit/blob/master/java/com/google/gerrit/entities/LabelFunction.java#L91-#L123
 
+    # FIXME: Why we shouldn't use crp[CONFIG_GROUPS]
+    
     # Extract the default policy
-    default_policy = get_gerrit_default_policy(crp)
-    rule = GERRIT_LABELS[default_policy.upper()]
-
-    # TODO: Pass project_config to the function, as it is parsed earlier
-    project_config = gerrit_parse_crp(crp)[CONFIG_PROJECT]
+    project_config = crp[CONFIG_PROJECT]
+    default_policy = _get_gerrit_default_policy(project_config)
+    rules = GERRIT_LABELS[default_policy.upper()]
 
     status = "MAY"
-    if rule["isRequired"]:
+    if rules["isRequired"]:
         status = "NEED"
 
     for item in review_units:
@@ -245,30 +252,58 @@ def check_gerrit_labels(crp, review_units):
         if score == '0':
             continue
 
-        if rule["isBlock"] and is_max_negative(project_config, score):
-            if not is_allowed_to_block(crp, reviewer):
+        if rules["isBlock"] and _is_max_negative(project_config, score):
+            if not _is_allowed_to_block(project_config, reviewer):
                 exit("Committer is not allowed to block the change")
             status = "REJECT"
             return status
 
-        if is_max_positive(project_config, score) or not rule["requiresMaxValue"]:
-            if not is_allowed_to_approve(crp, reviewer):
+        if _is_max_positive(project_config, score) or not rules["requiresMaxValue"]:
+            if not _is_allowed_to_approve(project_config, reviewer):
                 exit("Committer is not allowed to approve the change")
             status = "MAY"
 
-            if rule["isRequired"]:
+            if rules["isRequired"]:
                 status = "OK"
 
     return status
 
 
-# Check if there are minimum number of approavals
-def check_min_approvals(crp, review_units):
-    #TODO
-    return True
+# Check if the reviews created on GitHub are legitimate
+def gerrit_validate_reviews(crp, merge_commits, review_units):
+    # Split CPR into three parts: rules.pl, project.config, groups
+    crp = _gerrit_parse_crp(crp)
 
+    # First commit in the merge_commits list is the head of PR
+    head = merge_commits[0]
 
-# Check if there reviews from certain users
-def check_required_reviews(crp, review_units):
-    #TODO
+    project_config = crp[CONFIG_PROJECT]
+    # Check if the merger has the permission
+    if not _is_authorized_merger(project_config, head.committer):
+        return False
+
+    # Check if the author of code was authorized
+    if not _is_authorized_author(project_config, merge_commits):
+        return False
+
+    # Check for the direct push permissions
+    if merge_commit_type == DIRECTPUSH:
+        return _is_authorized_direct_push(project_config, head.committer)
+
+    # Check if there are customized rules
+    rules_pl = crp [CONFIG_RULES]
+    if rules_pl != '':
+        # FIXME:
+        exit('Customized rules!')
+
+    # Check if the basic rules (based on labels) are met
+    # Make decision based on the status
+    #https://github.com/GerritCodeReview/gerrit/blob/master/java/com/google/gerrit/server/rules/DefaultSubmitRule.java#L110
+    status = is_submittable(crp, review_units)
+    # TODO: Ensure it works for any situations
+    if status != "OK":
+        return False
+
+    # TODO: Check for other policies if needed
+    
     return True
