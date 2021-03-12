@@ -1,11 +1,12 @@
 from ast import literal_eval
+import re
 
 from constants import *
 from configs.github_config import *
 from crypto_manager import ed25519_sign_message
 from github_API import *
 from commit_manager import get_pr_code_changes
-
+from review_manager import parse_review, split_review_unit
 
 # Parse the GitHub CRP
 def _github_parse_crp(crp):
@@ -14,10 +15,10 @@ def _github_parse_crp(crp):
     # delimiter inbetween the components
     # Perhaps this can be changed into more clear
     # delimiters?
-    protection_rules, codeowners, gitattributes = \
+    protection_rules, codeowners, gitattributes, collaborators = \
         re.search(
             "({[\s\S]+?})b['\"]{1}([\s\S]+?)['\"]"
-            "{1}b['\"]{1}([\s\S]+?)['\"]{1}",
+            "{1}b['\"]{1}([\s\S]+?)['\"]{1}([\s\S]+)",
             crp.decode()
         ).groups()
 
@@ -30,7 +31,7 @@ def _github_parse_crp(crp):
                     ).decode('unicode-escape'),
         GITATTRIBUTES: gitattributes.encode('utf-8'
                     ).decode('unicode-escape'),
-        COLLABORATORS: "" #FIXME
+        COLLABORATORS: literal_eval(collaborators)
     }
 
 
@@ -59,8 +60,35 @@ def _is_authorized_direct_push(rules, collaborators, committer):
 
 # Check if there reviews from certain users
 def _check_required_reviews(codeowners, review_units):
-    #TODO if there are appoving reviews from codeowners
-    return True
+    # Get a list of the global codeowners' usernames / emails
+    # TODO: Improve this to check the file types / directories
+    # of modified files and check that the owners for those patterns
+    # have provided reviews instead of the global owners
+    global_owners = _parse_code_owners(codeowners)['*']
+
+    for unit in review_units:
+        review = parse_review(
+            split_review_unit(unit)[1])
+
+        for owner in global_owners:
+            # Check if the review was written
+            # by a global code owner
+            if (
+                review['name'] == owner 
+                or review['email'] == owner
+            ):
+                # Remove the owner that has provided
+                # a review from the list
+                global_owners.remove(owner)
+                break
+
+        # Check if the code owners list is
+        # empty, which means all owners have provided
+        # a review
+        if len(global_owners) == 0:
+            return True
+
+    return False
 
 
 # Check if there are minimum number of approavals
@@ -69,6 +97,34 @@ def _check_min_approvals(rules, collaborators, review_units):
     # Check outdated approving reviews are dismissed correctly
     # 
     return True
+
+
+# Parse the codeowners component of the CRP
+def _parse_codeowners(codeowners):
+    # Get the lines that don't begin with
+    # a pound or whitespace. This should be improved
+    # to detect lines that don't have a hash
+    # as the first character in the line
+    rules = re.findall(
+        '^[^#\s].*?$', 
+        codeowners, 
+        re.MULTILINE)
+
+    parsed_codeowners = {}
+    for rule in rules:
+        # The left hand side of the first whitespace 
+        # character is the file type / directory pattern
+        pattern = rule.split()[0]
+
+        # Extract all codeowners' usernames 
+        # and emails in each line
+        owners = re.findall(
+            '(?<=@)[\S]+|[\S]+@[\S]+',
+            rule)
+
+        parsed_codeowners[pattern] = owners
+
+    return parsed_codeowners
 
 
 # Check if the reviews created on GitHub are legitimate
