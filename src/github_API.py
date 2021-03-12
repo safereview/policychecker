@@ -9,7 +9,7 @@ from configs.github_config import *
 from constants import *
 from crypto_manager import *
 from collections import defaultdict
-
+from github_crp_manager import _github_parse_crp
 
 # Headers for different requests
 HEADERS = {
