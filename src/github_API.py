@@ -153,26 +153,31 @@ def form_github_crp(user, repo, branch_name):
 	gitattributes = ""
 	codeowners = ""
 	protection_rules = {}
+	collaborators = {}
 
 	try:
 		#TODO: Check if we need to capture the entire gitattributes
-		gitattributes = get_blob_content(user, repo, GITATTRIBUTES)
+		gitattributes = get_blob_content(user, repo, GITATTRIBUTES).decode()
 	except Exception:
 		#print("error in gitattr")
 		pass
 
-	try:
-		codeowners = get_blob_content(user, repo, CODEOWNERS)
-	except Exception:
-		#print("error in codeowners")
-		pass
+	# Check each possible location for codeowners files
+	for location in CODEOWNERS_LOCATIONS:
+		try:
+			# Collect found codeowners contents into a single string
+			# NOTE: We're assuming that each codeowners file will have
+			# non-conflicting unique entries
+			codeowners += get_blob_content(user, repo, location).decode()
+		except Exception:
+			#print("error in codeowners")
+			pass
 
 	try:
 		protection_rules = get_branch_protection_rules(user, repo, branch_name)
 	except Exception:
 		#print("error in protections")
 		pass
-
 
 	try:
 		collaborators = _get_collaborators(user, repo)
