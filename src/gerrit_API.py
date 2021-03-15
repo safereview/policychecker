@@ -149,7 +149,11 @@ def _form_gerrit_crp(g, project):
         pass
 
 	#TODO: Add DOC for the CRP format
-    crp = f"{rules_pl}{project_config}{groups}"
+    crp = (
+        f"RULES\n{rules_pl}"
+        f"\nPROJECTCONFIG\n{project_config}"
+        f"\nGROUPS\n{groups}"
+    )
     return crp.encode()
 
 
