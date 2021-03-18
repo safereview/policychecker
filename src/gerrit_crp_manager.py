@@ -8,12 +8,13 @@ from commit_manager import get_pr_code_changes
 
 # Parse the Gerrit CRP
 def _gerrit_parse_crp(crp):
-    # Split CRP into an array containing the three components
-    split_crp = re.split('(\[project\]\n|# UUID)', crp)
-    rules = split_crp[0]
-    # Join the appropriate elements together
-    project_config = ''.join(split_crp[1:3]).rstrip()
-    groups = ''.join(split_crp[3:])
+    # Extract the components from the CRP
+    rules, project_config, groups = \
+        re.search(
+            "RULES\n([\s\S]*?)\nPROJECTCONFIG\n([\s\S]*?)"
+            "\nGROUPS\n([\s\S]*)",
+            crp.decode()
+        ).groups()
 
     return {
         CONFIG_RULES: rules,

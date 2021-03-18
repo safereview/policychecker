@@ -181,7 +181,12 @@ def form_github_crp(user, repo, branch_name):
 		pass
 
 	#TODO: Add DOC for the CRP format
-	crp = f"{protection_rules}{codeowners}{gitattributes}{collaborators}"
+	crp = (
+		f"RULES\n{protection_rules}"
+		f"\nCODEOWNERS\n{codeowners}"
+		f"\nGITATTRIBUTES\n{gitattributes}"
+		f"\nCOLLABORATORS\n{collaborators}"
+	)
 	return crp.encode()
 
 

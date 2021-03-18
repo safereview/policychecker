@@ -10,27 +10,19 @@ from review_manager import parse_review, split_review_unit
 
 # Parse the GitHub CRP
 def _github_parse_crp(crp):
-    # Since the CRP is formed from byte objects
-    # coerced into strings, there will be a " b' "
-    # delimiter inbetween the components
-    # Perhaps this can be changed into more clear
-    # delimiters?
+    # Extract the components from the CRP
     protection_rules, codeowners, gitattributes, collaborators = \
         re.search(
-            "({[\s\S]+?})b['\"]{1}([\s\S]+?)['\"]"
-            "{1}b['\"]{1}([\s\S]+?)['\"]{1}([\s\S]+)",
+            "RULES\n([\s\S]*?)\nCODEOWNERS\n([\s\S]*?)"
+            "\nGITATTRIBUTES\n([\s\S]*?)\nCOLLABORATORS\n([\s\S]*)",
             crp.decode()
         ).groups()
 
     return {
         # Turn protection rules string into a dictionary
         PROTECTION_RULES: literal_eval(protection_rules),
-        # Turn escaped whitespace characters back into
-        # the actual characters
-        CODEOWNERS: codeowners.encode('utf-8'
-                    ).decode('unicode-escape'),
-        GITATTRIBUTES: gitattributes.encode('utf-8'
-                    ).decode('unicode-escape'),
+        CODEOWNERS: codeowners,
+        GITATTRIBUTES: gitattributes,
         COLLABORATORS: literal_eval(collaborators)
     }
 
