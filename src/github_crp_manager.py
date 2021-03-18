@@ -56,7 +56,7 @@ def _check_required_reviews(codeowners, review_units):
     # TODO: Improve this to check the file types / directories
     # of modified files and check that the owners for those patterns
     # have provided reviews instead of the global owners
-    global_owners = _parse_code_owners(codeowners)['*']
+    global_owners = _parse_codeowners(codeowners)['*']
 
     for unit in review_units:
         review = parse_review(
