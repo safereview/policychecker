@@ -22,8 +22,8 @@ def _github_parse_crp(crp):
         # Turn protection rules string into a dictionary
         PROTECTION_RULES: literal_eval(protection_rules),
         CODEOWNERS: codeowners,
-        GITATTRIBUTES: gitattributes,
-        COLLABORATORS: literal_eval(collaborators)
+        COLLABORATORS: literal_eval(collaborators),
+        GITATTRIBUTES: gitattributes
     }
 
 
@@ -40,6 +40,13 @@ def _is_authorized_author(collaborators, merge_commits):
     commits = get_pr_code_changes (merge_commits)
 
     # TODO Check if the code authors have the read access
+    return True
+
+
+# Check if the reviewer is authorized
+def _is_authorized_author(project_config, merge_commits):
+    # https://docs.github.com/en/github/collaborating-with-issues-and-pull-requests/about-pull-request-reviews
+     # TODO: Check if the reviewer has the read access to the repo
     return True
 
 
@@ -83,14 +90,6 @@ def _check_required_reviews(codeowners, review_units):
     return False
 
 
-# Check if there are minimum number of approavals
-def _check_min_approvals(rules, collaborators, review_units):
-    #TODO
-    # Check outdated approving reviews are dismissed correctly
-    # 
-    return True
-
-
 # Parse the codeowners component of the CRP
 def _parse_codeowners(codeowners):
     # Get the lines that don't begin with
@@ -119,14 +118,41 @@ def _parse_codeowners(codeowners):
     return parsed_codeowners
 
 
+# Remove stale reviews
+def ignore_stale_reviews(review_units):
+    # Find the latest code change commit and
+    # ignore reviews before that commit
+    return review_units
+
+
+# Check if there are minimum number of approavals
+def _check_min_approvals(rules, collaborators, codeowners, review_units):
+    # Check if outdated reviews must be ignored
+    if rules[GITHUB_DISMISS_STALE_REVIEWS] == True:
+        review_units = ignore_stale_reviews(review_units)
+
+    # Required reviews from
+    if (rules[GITHUB_CODE_OWNER_REVIEWS] == True and
+        not _check_required_reviews(codeowners, review_units)
+        ):
+        return False
+
+    min_approval = rules[GITHUB_MIN_APPROALS]
+    # It should be between 1 to 6
+    if  min_approval < 1 or min_approval > 6:
+        exit("Invalid number for the required approving reviews!")
+
+    return True
+
+
 # Check if the reviews created on GitHub are legitimate
 def github_validate_reviews(crp, merge_commits, review_units):
         # Split CPR into three parts: protection rules, codeowners, gitarrtibutes
     crp = _github_parse_crp(crp)
-    project_config = crp[CONFIG_PROJECT]
-    collaborators = crp[COLLABORATORS]
     rules = crp[PROTECTION_RULES]
+    collaborators = crp[COLLABORATORS]
     codeowners = crp[CODEOWNERS]
+    gitattributes = crp[GITATTRIBUTES]
 
     # First commit in the merge_commits list is the head of PR
     head = merge_commits[0]
@@ -139,15 +165,20 @@ def github_validate_reviews(crp, merge_commits, review_units):
     if not _is_authorized_author(project_config, merge_commits):
         return False
 
+    # Check if the reviewers have permission
+    if not _is_authorized_reviewer(project_config, merge_commits):
+        return False
+
     # Check for the direct push permissions
     if merge_commit_type == DIRECTPUSH:
         return _is_authorized_direct_push(rules, collaborators, head.committer)
 
-    if not _check_min_approvals(rules, collaborators, review_units):
-        if not _check_required_reviews(codeowners, review_units):
-            return False
+    #FIXME: Additional checks for the gitattributes file
 
-        # https://docs.github.com/en/github/administering-a-repository/about-protected-branches
+    # Check the min approvals
+    if (rules[GITHUB_REQURIED_REVIEWS] == True and
+        not _check_min_approvals(rules, collaborators, codeowners, review_units)
+        ):
         return False
 
     return True
