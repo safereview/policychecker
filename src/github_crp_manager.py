@@ -143,10 +143,11 @@ def github_validate_reviews(crp, merge_commits, review_units):
     if merge_commit_type == DIRECTPUSH:
         return _is_authorized_direct_push(rules, collaborators, head.committer)
 
-    if not _check_required_reviews(codeowners, review_units):
-        return False
-
     if not _check_min_approvals(rules, collaborators, review_units):
+        if not _check_required_reviews(codeowners, review_units):
+            return False
+
+        # https://docs.github.com/en/github/administering-a-repository/about-protected-branches
         return False
 
     return True

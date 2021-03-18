@@ -9,7 +9,7 @@ from configs.github_config import *
 from constants import *
 from crypto_manager import *
 from collections import defaultdict
-from github_crp_manager import _github_parse_crp
+
 
 # Headers for different requests
 HEADERS = {
@@ -197,23 +197,20 @@ def form_github_crp(user, repo, branch_name):
 
 # Validate the GitHub repo's code review policy
 def validate_github_crp(repo, branch):
-	# GitHub REST API call
-	REST = Github(TOKEN)
-
 	# Form the CRP
-	crp = form_github_crp(REST, USER, repo, branch)
+	crp = form_github_crp(USER, repo, branch)
 
     # TODO: Remove this part
 	# Sign and Store the CRP as a status check
 	crp_signature, verify_key = ed25519_sign_message(crp)
-	branch = get_branch(REST, USER, repo, branch)
+	branch = get_branch(USER, repo, branch)
 	head = branch['commit']['sha']
 	create_status(
-		REST, USER, repo, head,
+		USER, repo, head,
 		'success', 'CODE_REVIEW_POLICY', crp_signature
 		)
 
 	# Retrieve and Verify CRP
 	# TODO: We should pass head as parameters
-	retrieved_signature = get_crp_signature(REST, USER, repo, head)
+	retrieved_signature = get_crp_signature(USER, repo, head)
 	return crp, verify_signature(crp, retrieved_signature, verify_key)
