@@ -66,7 +66,7 @@ def create_status(user, repo, sha, status, context, description):
 	return post_request(endpoint, data, POST_HEADERS)
 
 
-# Retrive the crp signature from the Gerrit server
+# Retrieve the crp signature from the Gerrit server
 def get_crp_signature(user, repo, sha):
 	endpoint = f"{user}/{repo}/statuses/{sha}"
 	response = get_request(endpoint)
@@ -82,15 +82,15 @@ def get_branch_protection_rules(user, repo, branch_name):
 	# https://docs.github.com/en/rest/reference/repos#get-branch-protection
 	# https://docs.github.com/en/rest/reference/repos#update-branch-protection-preview-notices
 
-	# Check if 'Require pull request reviews before merging' is enabled
-	# If so, then
-	# - Get the minimum number of approvals
-	# - Check if 'Dismiss stale pull request' is enabled
-	# - Check if 'Require review from Code Owners' is enabled
-	# - Check for additional rules:
-	# 		- if commits must br signed
-	# 		- if admins must follow the CRP
+	# Extract certain users specified for a rule
+	def find_users(rule):
+		result = []
+		users = rule['users']
+		for user in users:
+			result.append(user['login'])
+		return result
 
+	# Call the API endpoint to extract protection tules
 	endpoint = f"{user}/{repo}/branches/{branch_name}/protection"
 	try:
 		response = get_request(endpoint, PRT_HEADERS)
@@ -100,32 +100,57 @@ def get_branch_protection_rules(user, repo, branch_name):
 	result = dict()
 	if(response.ok):
 		rules = json.loads(response.content)
+
+		# Check if push permission is narrowed to specific users
+		if GITHUB_PUSH_RESTRICTIONS not in rules.keys():
+			result[GITHUB_PUSH_RESTRICTIONS] = False
+		else:
+			result[GITHUB_PUSH_RESTRICTIONS] = True
+			result[GITHUB_AUTHORIZED_PUSH] = \
+				find_users(rules[GITHUB_PUSH_RESTRICTIONS])
+
 		# Check if 'required_pull_request_reviews' is enabled
 		if GITHUB_REQURIED_REVIEWS not in rules.keys():
 			result[GITHUB_REQURIED_REVIEWS] = False
 		else:
 			result[GITHUB_REQURIED_REVIEWS] = True
+			review_rules = rules[GITHUB_REQURIED_REVIEWS]
 
 			# Get the min number of required approving reviews
 			result[GITHUB_MIN_APPROALS] = \
-				rules[GITHUB_REQURIED_REVIEWS][GITHUB_MIN_APPROALS]
+				review_rules[GITHUB_MIN_APPROALS]
 
 			# Check if stale reviews must be dissmissed
 			result[GITHUB_DISMISS_STALE_REVIEWS] = \
-				rules[GITHUB_REQURIED_REVIEWS][GITHUB_DISMISS_STALE_REVIEWS]
+				review_rules[GITHUB_DISMISS_STALE_REVIEWS]
 
 			# Check if reviews from the code owner is required
 			result[GITHUB_CODE_OWNER_REVIEWS] = \
-				rules[GITHUB_REQURIED_REVIEWS][GITHUB_CODE_OWNER_REVIEWS]
+				review_rules[GITHUB_CODE_OWNER_REVIEWS]
 
-		# Check for additional rules:
-		# 1) require_signed_commits: 
-		# 		- We must use another HEADER to get the information
-		# 		- However, we ignore this check since 
-		# 			PolicyChecker assumes all commists are signed
-		# 2) include_administrators
-		#result['require_signed_commits'] = rules['required_signatures']['enabled']
+			# Check which users are allowsed to dismiss reviews.
+			if GITHUB_DISMISSAL_RESTRICTION not in review_rules:
+				result[GITHUB_DISMISSAL_RESTRICTION] = False
+			else:
+				result[GITHUB_DISMISSAL_RESTRICTION] = True
+				result[GITHUB_AUTHORIZED_DISMISS] = \
+					find_users(review_rules[GITHUB_DISMISSAL_RESTRICTION])
+
+		# Check for additional rules.
+		# 1) required signed commits:
+		# We must use another HEADER to get the information. However,
+		# we ignore this check since we assumes all commists are signed.
+		#result[] = rules['required_signatures']['enabled']
+
+		# 2) include_administrators:
 		result[GITHUB_ENFORCE_ADMIN] = rules[GITHUB_ENFORCE_ADMIN]['enabled']
+
+		# 3) enforce the linear history:
+		# The merge strategy must be 'Squash and merge' or 'Rebase and merge'
+		if GITHUB_LINEAR_HISTORY not in rules.keys():
+			result[GITHUB_LINEAR_HISTORY] = False
+		else:
+			result[GITHUB_LINEAR_HISTORY] = True
 
 	return result
 
