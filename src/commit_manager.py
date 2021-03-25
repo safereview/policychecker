@@ -13,14 +13,33 @@ from review_manager import is_first_review
 # List commits with code changes in a PR
 def get_pr_code_changes(merge_commits):
     commits = []
-    # The first commit in the list is the HEAD of PR
-    # The second commit is the HEAD's parent
-    # So start from the first commit in the list
-    # Compare each commit with its parent and add it
-    # to commits list if there are code changes
-    # git diff --name-only SHA1 SHA2
+    for commit in merge_commits:
+        if not commit.parents:
+            commits.append(commit)
+        else:
+            first_parent = commit.parents[0]
+            changed_files = get_commits_diff(
+                repo, 
+                commit.hexsha, 
+                first_parent.hexsha)
+
+            # Compare each commit with its parent and add it
+            # to commits list if there are code changes
+            if changed_files:
+                commits.append(commit)
 
     return commits
+
+
+# List files modified in a commit from its parent
+def get_commits_diff(repo, first_sha, second_sha):
+    changed_files = repo.git.diff(
+        f"{first_sha}..{second_sha}",
+        name_only=True
+        ).split('\n')
+
+    return changed_files
+
 
 # List all commits in a branch
 def get_branch_commits(repo, branch):
