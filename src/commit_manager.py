@@ -14,17 +14,19 @@ from review_manager import is_first_review
 def get_pr_code_changes(merge_commits):
     commits = []
     for commit in merge_commits:
+        # Add commit to list if it's
+        # the first in the branch
         if not commit.parents:
             commits.append(commit)
         else:
+            # Compare each commit with its parent and add it
+            # to commits list if there are code changes
             first_parent = commit.parents[0]
             changed_files = get_commits_diff(
                 repo, 
                 commit.hexsha, 
                 first_parent.hexsha)
-
-            # Compare each commit with its parent and add it
-            # to commits list if there are code changes
+                
             if changed_files:
                 commits.append(commit)
 

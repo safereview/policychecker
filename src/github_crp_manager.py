@@ -27,34 +27,74 @@ def _github_parse_crp(crp):
     }
 
 
-# Check if the merger is authorized to perfomr a merge request
-def _is_authorized_merger(collaborators, committer):
-    # TODO check if the committer has write permission
-    return True
+# Check if the merger is authorized to perform a merge request
+def _is_authorized_merger(rules, collaborators, committer):
+    # Check if the committer has the write permission,
+    # and the "Restrict who can push to matching branch" is not enabled 
+    # rule is not enabled.
+    if (
+        collaborators[committer]['push']
+        and not rules[GITHUB_PUSH_RESTRICTIONS]
+    ):
+        return True
+    else:
+        # If that rule is enabled then we should ignore 
+        # the write permission, and the committer must be among 
+        # specified users under the above rule.
+        if (
+            rules[GITHUB_PUSH_RESTRICTIONS]
+            and committer in rules[GITHUB_AUTHORIZED_PUSH]
+        ):
+            return True
+        else:
+            return False
 
 
 # Check if the PR Creator has read access to repo
 def _is_authorized_author(collaborators, merge_commits):
     # Get commits with code changes in a PR
-    # FIXME: Double check the following function
-    commits = get_pr_code_changes (merge_commits)
+    code_change_commits = get_pr_code_changes(merge_commits)
 
-    # TODO Check if the code authors have the read access
+    # Check if the author of each commit has
+    # permission to read from the repo
+    for commit in code_change_commits:
+        author = commit.author.name
+        if not collaborators[author]['pull']:
+            return False
+
     return True
 
 
 # Check if the reviewer is authorized
-def _is_authorized_author(project_config, merge_commits):
-    # https://docs.github.com/en/github/collaborating-with-issues-and-pull-requests/about-pull-request-reviews
-     # TODO: Check if the reviewer has the read access to the repo
+def _is_authorized_reviewer(collaborators, merge_commits):
+    # Get the commits that introduced code changes in a PR
+    code_change_commits = set(
+        get_pr_code_changes(merge_commits))
+
+    # Get the commits with reviews by subtracting the code
+    # change commits from the set of all merge commits
+    review_commits = set(merge_commits) - code_change_commits
+
+    for commit in review_commits:
+        author = commit.author.name
+        if not collaborators[author]['pull']:
+            return False
     return True
 
 
 # Check if the committer has the direct push permission
 def _is_authorized_direct_push(rules, collaborators, committer):
-    # TODO: Check if the merger is an administrtor and the code review policy
+    # Check if the merger is an administrator and the code review policy
     # excludes administrtors from following the code review policy
-    return True
+    # and that the committer can push to the matching branch
+    if (
+        not rules[GITHUB_ENFORCE_ADMIN]
+        and collaborators[committer]['admin']
+        and collaborators[committer]['push']
+    ):
+        return True
+    else:
+        return False
 
 
 # Check if there reviews from certain users
