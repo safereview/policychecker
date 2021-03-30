@@ -162,6 +162,7 @@ def _get_collaborators(user, repo):
 	content = json.loads(response.content)
 
 	collaborators = {}
+
 	for user_info in content:
 		# Create an entry for each user
 		# containing their repo permissions
