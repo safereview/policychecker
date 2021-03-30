@@ -24,6 +24,7 @@ CONFIG_BRANCH = 'refs/meta/config'
 CONFIG_PROJECT = 'project.config'
 CONFIG_GROUPS = 'groups'
 CONFIG_RULES = 'rules.pl'
+CONFIG_GROUPS_MEMBERS = 'GroupsMembers'
 ALL_PROJECTS = 'All-Projects'
 
 # Merge Options

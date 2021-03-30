@@ -67,20 +67,40 @@ def list_files(g, project, head):
 
 # Find the groups that a committer is in
 def find_group_membership(committer_name, committer_email):
+    g = get_rest_api(USER, PASS, url)
     # Get all of the groups in the Gerrit project
-    groups = list_groups()
+    groups = list_groups(g)
     committers_groups = []
 
-    for g in groups:
-        g_id = groups[g]['group_id']
-        for member in get_group_info(g_id)['members']:
+    for group in groups:
+        group_id = groups[group]['group_id']
+        for member in get_group_info(g, group_id)['members']:
             if (
                 member['name'] == committer_name
                 and member['email'] == committer_email
             ):
-                committers_groups.append(g)
+                committers_groups.append(group)
     
     return committers_groups
+
+
+# Get each group's members
+def _get_group_members(g):
+    groups = list_groups(g)
+    group_members = {}
+
+    for group in groups:
+        group_id = groups[group]['group_id']
+        group_info = get_group_info(g, group_id)
+
+        # Create a record in the dictionary
+        # with the key being the group name
+        # and the value being a list of each
+        # member's Gerrit profile info
+        group_members[group_info['name']] = \
+            group_info['members']
+
+    return group_members
 
 
 # Get a list of groups
@@ -139,12 +159,15 @@ def _form_gerrit_crp(g, project):
     rules_pl = ''
     project_config = ''
     groups = ''
+    members = {}
+
     try:
         # rules.pl is not created by default. It is
         # available only if there is a customized rule.
         rules_pl = get_blob_content(g, ALL_PROJECTS, ap_head, CONFIG_RULES)
         groups = get_blob_content(g, ALL_PROJECTS, ap_head, CONFIG_GROUP)
         project_config = get_blob_content(g, ALL_PROJECTS, ap_head, CONFIG_PROJECT)
+        members = _get_group_members(g)
     except Exception:
         pass
 
@@ -153,6 +176,7 @@ def _form_gerrit_crp(g, project):
         f"RULES\n{rules_pl}"
         f"\nPROJECTCONFIG\n{project_config}"
         f"\nGROUPS\n{groups}"
+        f"\nMEMBERS\n{members}"
     )
     return crp.encode()
 

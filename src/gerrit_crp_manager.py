@@ -5,21 +5,23 @@ from crypto_manager import ed25519_sign_message
 from gerrit_API import *
 from commit_manager import get_pr_code_changes
 
+from ast import literal_eval
 
 # Parse the Gerrit CRP
 def _gerrit_parse_crp(crp):
     # Extract the components from the CRP
-    rules, project_config, groups = \
+    rules, project_config, groups, members = \
         re.search(
             "RULES\n([\s\S]*?)\nPROJECTCONFIG\n([\s\S]*?)"
-            "\nGROUPS\n([\s\S]*)",
+            "\nGROUPS\n([\s\S]*?)\nMEMBERS\n([\s\S]*)",
             crp.decode()
         ).groups()
 
     return {
         CONFIG_RULES: rules,
         CONFIG_PROJECT: project_config,
-        CONFIG_GROUPS: groups
+        CONFIG_GROUPS: groups,
+        CONFIG_GROUPS_MEMBERS: literal_eval(members)
     }
 
 
