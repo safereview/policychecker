@@ -159,6 +159,12 @@ def get_pr_commits(server, repo, commit):
     return merge_commits
 
 
+def compare_timestamps(commit):
+    # Return True if Author and committer timestamps are the same
+    # Otherwise return False
+    return True
+
+
 # TOTO: Merge Gerrit and GitHub versions
 # Extract the GitHub merge requests' commits
 def github_extract_merge_request_commits(repo, commit):
@@ -189,13 +195,20 @@ def github_extract_merge_request_commits(repo, commit):
             merge_method = DIRECTPUSH
 
         # REBASE or SQUASH:
-        # Commits with one parent and at least one review unit
+        #   Commits with one parent and at least one review unit
         elif r == 1:
-            if not is_first_review(review_units):
-                    merge_method = REBASE
-                    merge_commits = get_rebase_commits(repo, commit)
-            #else
-                #FIXME: differentiate between REBASE and SQUASH
+            # SQUASH:
+            #   If commit contains the first review unit AND
+            #   author and committer timestamps are the same
+            if (is_first_review(review_units)
+            and compare_timestamps (commit)):
+                merge_method = SQUASH
+            # REBASE:
+            #   If not the first review unit OR
+            #   author and committer timestamps are the same
+            else:
+                merge_method = REBASE
+                merge_commits = get_rebase_commits(repo, commit)
 
         # SQUASH:
         # Commits with one parent and more than one review unit
