@@ -161,10 +161,10 @@ def get_pr_commits(server, repo, commit):
     return merge_commits
 
 
+# Check if author and committer timestamps are the same
 def compare_timestamps(commit):
-    # Return True if Author and committer timestamps are the same
-    # Otherwise return False
-    return True
+    return commit.authored_datetime == \
+        commit.comitted_datetime
 
 
 # TOTO: Merge Gerrit and GitHub versions
