@@ -54,7 +54,7 @@ def get_blob_content(user, repo, path):
 
 
 # Create a status check
-def create_status(user, repo, sha, status, context, description):
+def _create_status(user, repo, sha, status, context, description):
 	endpoint = f"{user}/{repo}/statuses/{sha}"
 	data = {
 		'state': status,
@@ -67,7 +67,7 @@ def create_status(user, repo, sha, status, context, description):
 
 
 # Retrieve the crp signature from the Gerrit server
-def get_crp_signature(user, repo, sha):
+def _get_crp_signature(user, repo, sha):
 	endpoint = f"{user}/{repo}/statuses/{sha}"
 	response = get_request(endpoint)
 	json_load = json.loads(response.content)
@@ -226,17 +226,16 @@ def validate_github_crp(repo, branch):
 	# Form the CRP
 	crp = form_github_crp(USER, repo, branch)
 
-    # TODO: Remove this part
+    # FIXME: Remove this part
 	# Sign and Store the CRP as a status check
 	crp_signature, verify_key = ed25519_sign_message(crp)
 	branch = get_branch(USER, repo, branch)
-	head = branch['commit']['sha']
-	create_status(
+	sha = branch['commit']['sha']
+	_create_status(
 		USER, repo, head,
 		'success', 'CODE_REVIEW_POLICY', crp_signature
 		)
 
 	# Retrieve and Verify CRP
-	# TODO: We should pass head as parameters
-	retrieved_signature = get_crp_signature(USER, repo, head)
+	retrieved_signature = _get_crp_signature(USER, repo, sha)
 	return crp, verify_signature(crp, retrieved_signature, verify_key)
