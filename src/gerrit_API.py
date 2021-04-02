@@ -129,7 +129,7 @@ def get_account_info(g, aid):
 
 
 # Store the crp signature as review label on the server
-def store_crp_signature(g, project, crp_signature):
+def _store_crp_signature(g, project, crp_signature):
     label = {
         'commit_message' : 'Code-Review-Policy',
         'values' : { '0' : crp_signature }
@@ -189,10 +189,10 @@ def validate_gerrit_crp(repo, branch):
 	# Form the CRP
 	crp = _form_gerrit_crp(REST, repo)
 
-    # TODO: Remove this part
+    # FIXME: Remove this part
 	# Sign and Store the CRP
 	crp_signature, verify_key = ed25519_sign_message(crp)
-	store_crp_signature(REST, repo, crp_signature)
+	_store_crp_signature(REST, repo, crp_signature)
 
 	# Retrieve and Verify CRP
 	retrieved_signature = _get_crp_signature(REST, repo)

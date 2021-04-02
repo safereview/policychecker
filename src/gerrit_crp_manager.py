@@ -93,6 +93,40 @@ def _is_authorized_author(project_config, merge_commits):
             return True
 
 
+# Check if the reviewer is authorized
+def _is_authorized_reviewer(project_config, committer):
+    # Get committer group
+    committers_groups = find_group_membership(
+        committer.name,
+        committer.email
+    )
+
+    # Extract access rights for the 'refs/heads/*'
+    # and check if the user has the right permission
+    access_rights = re.search("\[access \"refs/heads/\*\"\]"
+        "[\s\S]+?(?=\[)", project_config
+        ).group()
+
+    if not committers_groups:
+        return False
+    else:
+        for g in committers_groups:
+            # Check if the committer belongs to a 
+            # group that is allowed to push changes
+            # for code review
+            match = re.search(
+                "label-Code-Review = "
+                f"[+-]?[0-9]+?..[+-]?[0-9]+? group {g}",
+                access_rights
+            )
+            if match:
+                return True
+
+        return False
+
+    return True
+
+
 # Check if the committer has the direct push permission
 def _is_authorized_direct_push(project_config, committer):
     # Get committer group
@@ -287,6 +321,10 @@ def gerrit_validate_reviews(crp, merge_commits, review_units):
 
     # Check if the author of code was authorized
     if not _is_authorized_author(project_config, merge_commits):
+        return False
+
+    # Check if the reviewers have permission
+    if not _is_authorized_reviewer(project_config, merge_commits):
         return False
 
     # Check for the direct push permissions
