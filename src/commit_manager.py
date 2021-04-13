@@ -221,10 +221,17 @@ def github_extract_merge_request_commits(repo, commit):
         # Commits with two parents
         merge_commits = get_pr_commits(repo, commit)
 
+    # Extract review units from all
+    # merge commits in the change
+    all_review_units = []
+    for commit in merge_commits:
+        for review_unit in get_review_units(commit):
+            all_review_units.append(review_unit)
+
     return [
         merge_method,
         merge_commits,
-        review_units
+        all_review_units
     ]
 
 
