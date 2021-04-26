@@ -43,7 +43,8 @@ PGP_END = '-----END PGP SIGNATURE-----'
 # Crypto
 # TODO: Make it work for any condition in particular
 # when there is no existing keys at ~/.gnupg/ or 'C:\\Users\\user\\.gnupg'
-KEYS_DIR = '/home/hmd/.gnupg'
+# KEYS_DIR = '/home/hmd/.gnupg'
+KEYS_DIR = '/home/fernando/.gnupg'
 ED25519_KEY = 'ed25519_pub_key.pem'
 
 # Gerrit Rules

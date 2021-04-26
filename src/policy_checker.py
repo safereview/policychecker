@@ -66,10 +66,16 @@ def validate_reviews(server, crp, review_info):
 
 
 # Validate all reviews in a branch
-def validate_branch(server, repo, branch):
+def validate_branch(server, repo_path, branch):
+    try:
+        # Create the local Repo object
+        repo = Repo(repo_path)
+    except Exception:
+        exit(f"{repo_path} is not a valid Git repository path")
+
     # Extract the repo name from the repo path
     # e.g., 'd1/d2/f1' returns 'f1'
-    repo_name = os.path.basename(repo)
+    repo_name = os.path.basename(repo_path)
 
     # Validate the CRP signature
     valid = True
@@ -89,7 +95,7 @@ def validate_branch(server, repo, branch):
 
     # Check commit signatures
     for commit in list(commits):
-        if not validate_commit_signature(commit):
+        if not validate_commit_signature(repo, commit):
             return False
 
     # Get the branch head
@@ -159,7 +165,7 @@ def main():
 
     server = args.server.lower()
     branch = args.branch
-    repo_path = args.repo
+    repo_path = args.repo.rstrip('/')
     
     # Validate the branch
     validate_branch(server, repo_path, branch)
