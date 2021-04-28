@@ -42,6 +42,9 @@ def post_request(endpoint, data, headers = HEADERS):
 def get_branch(user, repo, branch):
 	endpoint = f"{user}/{repo}/branches/{branch}"
 	response = get_request(endpoint)
+	if response.status_code == 404:
+		exit(f"{branch} branch not found in the specified repository")
+
 	return  json.loads(response.content)
 
 
@@ -231,8 +234,9 @@ def validate_github_crp(repo, branch):
 	crp_signature, verify_key = ed25519_sign_message(crp)
 	branch = get_branch(USER, repo, branch)
 	sha = branch['commit']['sha']
+
 	_create_status(
-		USER, repo, head,
+		USER, repo, sha,
 		'success', 'CODE_REVIEW_POLICY', crp_signature
 		)
 
